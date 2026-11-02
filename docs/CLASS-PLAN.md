@@ -38,3 +38,7 @@ A proposed $15/month subscription would require 200 paying subscribers for $3,00
 ### Evidence-first product policy
 
 The statistical engine supplies scoring and experimental recommendations. AI only prioritizes existing evidence and limitations, never substitutes its own statistics, odds, probabilities, schedule multipliers or betting edges. Schedule pace is a descriptive scenario. The daily shortlist distinguishes Leans from Pass watchlist items. No minimum pick count is forced.
+
+## Live AI verification completed, November 2, 2026
+
+OPENAI_API_KEY is configured privately in Vercel Production, AI_MODEL is gpt-6-luna, and the live funded API returned a valid grounded NFL trade brief. The deployed route kept the computed recommendation and rendered numerical statements only from server-generated evidence. Credentials were not read back, committed or displayed. AI prerequisites are now configured; repeat end-to-end checks after model or prompt changes. The required Stripe checkout/live $1 proof and actual class feedback/submissions remain outstanding.
