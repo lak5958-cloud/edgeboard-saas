@@ -1,6 +1,6 @@
 # Automatic data collection and fantasy scoring
 
-The hosted collector is a bounded server job, independent of visitors. Supabase Cron calls the authenticated Vercel endpoint every ten minutes. It refreshes injuries and exact DraftKings quotes, checks all NBA/NFL team rosters and schedules hourly, and resumes a current-season final-box-score queue (80 events maximum per invocation). Source failures retain earlier files and their timestamps. Status is visible on the owner's Account page.
+The hosted collector is a bounded server job, independent of visitors. Supabase Cron calls the authenticated Vercel endpoint every ten minutes. It refreshes injuries and exact DraftKings and FanDuel quotes, checks all NBA/NFL team rosters and schedules hourly, and resumes a current-season final-box-score queue (80 events maximum per invocation). Source failures retain earlier files and their timestamps. Status is visible on the owner's Account page.
 
 ## Owner setup
 
@@ -36,3 +36,9 @@ Tests cover real archived NFL box-score reconciliation, corrupt/truncated catego
 ## Plain-English trade view
 
 The result leads with a default accept/keep lean, reasons and conditions that could change it. Missing history and unavailable players produce an actionable hold rather than invented scores. Sources, scoring components and schedule details are expandable. ESPN headshots use the verified roster athlete ID and a restricted image host; missing images fall back to initials. No RotoTrade proprietary values or full-league import are used.
+
+## Daily picks, sportsbook-specific refresh
+
+The collector requests DraftKings and FanDuel together. Each NBA/NFL shortlist is independently screened at that book’s exact quoted thresholds, prices and timestamps; no other books are available in the selector. Published reports use byBook → league. DraftKings-only legacy reports are never relabeled as FanDuel. Missing provider coverage is an explicit empty state. Every displayed quote is checked again for freshness and pregame eligibility at request time.
+
+Cards lead with the player portrait, readable statistic, book/price and matchup. “Why it could hit” uses actual historical counts and averages; “Main risks” translates incomplete checks and role/availability limitations. “Our verdict” preserves Lean or Pass. Detailed model probabilities, expected net, test counts and sources remain expandable. No arbitrary confidence score or invented opponent/usage story is generated. Player headshots use the existing bounded same-origin image route.
