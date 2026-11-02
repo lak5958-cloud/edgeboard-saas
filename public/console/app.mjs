@@ -228,23 +228,23 @@ function refreshMessage(message,isError=false,busy=false){
 async function pollRefresh(){
  let done=false;
  for(let i=0;i<270;i++){
-  await new Promise(resolve=>setTimeout(resolve,2000));
+  await new Promise(resolve=>setTimeout(resolve,10000));
   try{const state=await fetchJson('/api/refresh-status');
    if(state.running){refreshMessage(`Refresh in progress since ${dt(state.startedAt)}. Updating sportsbook odds and historical player statistics…`,false,true);continue;}
    done=true;const loaded=await load();
    if(loaded===false){refreshMessage('Refresh finished, but one or more saved files could not be loaded. See the warning on the page.',true,false);break;}
-   if(state.ok)refreshMessage(`Refresh completed ${dt(state.finishedAt)}. ${state.summary||'Latest local files loaded.'}`,false,false);
+   if(state.ok)refreshMessage(`Refresh completed ${dt(state.finishedAt)}. ${state.summary||'Latest published files loaded.'}`,false,false);
    else refreshMessage(`Refresh stopped: ${state.message||'Unknown error'}. Existing data was preserved.`,true,false);
    break;
   }catch(err){refreshMessage(`Cannot read refresh status: ${err.message}`,true,false);done=true;break;}
  }
- if(!done)refreshMessage('Refresh is taking too long. Check data\\refresh.log and try again after the updater finishes.',true,false);
+ if(!done)refreshMessage('Refresh is still pending. Check Owner controls on the Account page. Your published data is retained.',true,false);
  refreshRunning=false;
 }
 $('reloadSaved').addEventListener('click',async()=>{refreshMessage('Reading saved market and game-log files…');const loaded=await load();if(!loaded){refreshMessage('Saved snapshot reload failed. Read the page warning for the exact file problem.',true,false);return;}refreshMessage(`Saved snapshot reloaded at ${new Date().toLocaleTimeString()}. ${evidence.length} stat series loaded. ${evidenceLoadError?'Game-log warning: '+evidenceLoadError:'No provider request was made.'}`);});
 $('reload').addEventListener('click',async()=>{
  if(refreshRunning)return;
- refreshRunning=true;refreshMessage('Starting local provider and statistics refresh…',false,true);
+ refreshRunning=true;refreshMessage('Queuing a server refresh. You can keep browsing…',false,true);
  try{
   await verifyRefreshServer();
   const r=await fetch('/api/refresh',{method:'POST',headers:{'X-EdgeBoard-Action':'refresh'}});
@@ -320,3 +320,5 @@ function renderPicksDesk(){
  const g=selectedGame();$('research').innerHTML=`<article class="sourceItem"><div class="sourceMeta">GAME SHORTLIST</div><h4>${esc(g?.game||'Select a game')}</h4><p>The scanner evaluates the saved game board, independent of the player currently selected in the market explorer.</p><p>Each candidate carries numerical support, risks and source links. Use Open full Evidence Readback to inspect its exact line and price and populate this desk.</p><p>Leans are experimental. Watchlist cards remain Pass. Current injuries, roster history and unmodeled lineup effects still require review.</p></article>`;
  for(const id of ['research','experts','comparison'])$(id).classList.toggle('hidden',id!=='research');$('notePanel').classList.add('hidden');$('inputPanel').classList.add('hidden');for(const id of ['researchTab','expertTab','booksTab'])$(id).classList.toggle('active',id==='researchTab');
 }
+
+void fetchJson('/api/session').then(access=>{$('reload').disabled=!access.owner;}).catch(()=>{});
