@@ -1,7 +1,7 @@
 import {pageView} from './views.mjs';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let league='NFL',players=[],give=[],receive=[],access={user:null,pro:false},currentTrade=null,revision=0;
 const sources=urls=>[...new Set(urls||[])].filter(u=>{try{return new URL(u).protocol==='https:'}catch{return false}}).slice(0,8).map((u,i)=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">Source ${i+1} ↗</a>`).join('');
-async function api(route,body){const r=await fetch('/api/'+route,{cache:'no-store',...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const b=await r.json();if(!r.ok)throw Error(r.status===503?'This feature is not connected yet. Please try again later.':b.error||'The request could not finish. Please try again.');return b;}
+async function api(route,body){const r=await fetch('/api/'+route,{cache:'no-store',...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const b=await r.json();if(!r.ok)throw Error(b.error||'The request could not finish. Please try again.');return b;}
 function toast(s){$('#toast').textContent=s;$('#toast').style.display='block';setTimeout(()=>$('#toast').style.display='none',7000)}
 function bindLeagues(){document.querySelectorAll('[data-league]').forEach(b=>b.onclick=()=>{if(league===b.dataset.league)return;revision++;league=b.dataset.league;give=[];receive=[];players=[];currentTrade=null;render()})}
 function render(){
