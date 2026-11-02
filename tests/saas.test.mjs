@@ -17,3 +17,16 @@ test('paid authorization trusts verified identity and server entitlements, not u
  globalThis.fetch=async(url,options)=>{if(String(url).includes('/auth/v1/user')){assert.equal(options.headers.Authorization,'Bearer synthetic-jwt');return new Response(JSON.stringify({id:'synthetic-user',email:'synthetic@example.org',user_metadata:{pro:true}}),{status:200})}return new Response(JSON.stringify([]),{status:200})};
  try{const a=await accessFor({headers:{cookie:'eb_access=synthetic-jwt'}},response());assert.equal(a.user.id,'synthetic-user');assert.equal(a.pro,false)}finally{globalThis.fetch=original;for(const k of ['SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY']){if(prior[k]===undefined)delete process.env[k];else process.env[k]=prior[k]}}
 });
+
+test('owner access is server-granted, permanent, and distinct from grader or subscription access',async()=>{
+ const original=globalThis.fetch,keys=['SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY'],prior=Object.fromEntries(keys.map(k=>[k,process.env[k]]));let rows=[];
+ process.env.SUPABASE_URL='https://synthetic.supabase.co';process.env.SUPABASE_ANON_KEY='synthetic';process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic-service';
+ globalThis.fetch=async url=>new Response(JSON.stringify(String(url).includes('/auth/v1/user')?{id:'synthetic-user',user_metadata:{owner:true}}:rows),{status:200});
+ try{
+  const req={headers:{cookie:'eb_access=synthetic-jwt'}};
+  let a=await accessFor(req,response());assert.equal(a.owner,false);assert.equal(a.pro,false);
+  rows=[{kind:'owner',expires_at:null}];a=await accessFor(req,response());assert.equal(a.owner,true);assert.equal(a.pro,true);
+  rows=[{kind:'grader',expires_at:null}];a=await accessFor(req,response());assert.equal(a.owner,false);assert.equal(a.pro,true);
+  rows=[{kind:'subscription',expires_at:'2000-01-01T00:00:00Z'}];a=await accessFor(req,response());assert.equal(a.owner,false);assert.equal(a.pro,false);
+ }finally{globalThis.fetch=original;for(const k of keys){if(prior[k]===undefined)delete process.env[k];else process.env[k]=prior[k];}}
+});
