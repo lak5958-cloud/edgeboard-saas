@@ -7,7 +7,7 @@ test('invalid cursors and individually oversized records cannot silently truncat
 test('manifest paths cannot escape the immutable private import prefix',()=>{assert.deepEqual(manifestEntry({files:{a:info}},'a'),info);assert.equal(manifestEntry({files:{}},'absent'),null);for(const path of ['../config/key','https://foreign.example/x','imports/a/../../secret'])assert.throws(()=>manifestEntry({files:{a:{...info,path}}},'a'),/manifest/)});
 test('concurrent snapshot requests share manifest/object reads and verify integrity',async()=>{
  const {snapshot}=await import('../lib/cloud.mjs'),original=globalThis.fetch,env={...process.env};process.env.SUPABASE_URL='https://synthetic.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic-service';let calls=0;
- globalThis.fetch=async url=>{calls++;return String(url).endsWith('manifest.json')?new Response(JSON.stringify({files:{'test.json':info}})):new Response(gzip)};
+ globalThis.fetch=async url=>{calls++;if(new URL(url).pathname.endsWith('manifest.json'))assert(new URL(url).searchParams.has('v'));return new URL(url).pathname.endsWith('manifest.json')?new Response(JSON.stringify({files:{'test.json':info}})):new Response(gzip)};
  try{assert.deepEqual(await Promise.all([snapshot('test.json',null),snapshot('test.json',null)]),[data,data]);assert.equal(calls,2)}finally{globalThis.fetch=original;for(const k of ['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY']){if(env[k]===undefined)delete process.env[k];else process.env[k]=env[k]}}
 });
 test('missing storage objects fall back, but storage permission failures remain errors',async()=>{
