@@ -3,7 +3,7 @@
   "outputDirectory": "public",
   "functions": {
     "api/server.mjs": {
-      "maxDuration": 60,
+      "maxDuration": 240,
       "includeFiles": "lib/**"
     }
   },
