@@ -1,15 +1,17 @@
+import {quoteProfile} from './rosters.mjs';
 import {finite,mean} from './prediction.mjs';
 const name=s=>String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z]/g,'').replace(/(jr|sr|iii|ii)$/,'');
 export function injuryRows(payload,league,fetchedAt){
  const out=[];for(const team of payload?.injuries||[]){for(const item of team.injuries||[]){
  const player=item.athlete?.displayName||item.athlete?.fullName;
  if(!player||!item.status)continue;
- out.push({league,subject:player,team:team.displayName||team.team?.displayName||'',status:item.status,detail:item.longComment||item.shortComment||'',reportedAt:item.date||null,fetchedAt,source:'ESPN injury listing (unofficial API; not team clearance)',url:`https://www.espn.com/${league.toLowerCase()}/injuries`});
+ out.push({league,athleteID:item.athlete?.id?String(item.athlete.id):null,teamID:team.team?.id?String(team.team.id):item.athlete?.team?.id?String(item.athlete.team.id):null,subject:player,team:team.displayName||team.team?.displayName||'',status:item.status,detail:item.longComment||item.shortComment||'',reportedAt:item.date||null,fetchedAt,source:'ESPN injury listing (unofficial API; not team clearance)',url:`https://www.espn.com/${league.toLowerCase()}/injuries`});
  }}return out;
 }
 export function contextReadback(q,context={},now=new Date(),game=null){
  const why=[],risks=[],sources=[];let availability=null;
- const current=(context.injuries||[]).filter(i=>i.league===q.league&&name(i.subject)===name(q.player));
+ const profile=quoteProfile(q,game,context.rosters||[]),ambiguous=new Set((context.rosters||[]).filter(p=>p.league===q.league&&name(p.subject)===name(q.player)).map(p=>String(p.id||p.subject))).size>1;
+ const current=(context.injuries||[]).filter(i=>i.league===q.league&&name(i.subject)===name(q.player)&&(i.athleteID&&profile?.id?String(i.athleteID)===String(profile.id):!ambiguous||profile&&(String(i.teamID||'')===String(profile.currentTeamID)||[profile.team,profile.teamName].filter(Boolean).includes(i.team))));
  const injury=current.sort((a,b)=>String(b.fetchedAt).localeCompare(String(a.fetchedAt)))[0];
  if(injury){const age=(now-Date.parse(injury.fetchedAt))/3600000;const fresh=Number.isFinite(age)&&age>=0&&age<=2;
  why.push(`Injury listing: ${injury.status}; fetched ${injury.fetchedAt}; reported ${injury.reportedAt||'date unavailable'}. ${injury.detail||''}`);

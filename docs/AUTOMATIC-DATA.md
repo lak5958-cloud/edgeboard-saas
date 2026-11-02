@@ -52,3 +52,13 @@ The browser checks the published snapshot revision every 60 seconds and on retur
 Player, book, side, period and alternate threshold are preserved on background updates. An exact selection that disappears is marked unavailable; another line is not selected silently. The game scanner still runs in its worker with selected-game evidence. Outside-source market jumps first load the requested game, then apply the existing exact-period/line/book checks.
 
 Daily Picks includes a Lean/Pass guide, the experimental outright model win probability beside the name, the scan funnel and a one-market-per-player explanation. The hit chance is not an independently calibrated confidence score. No decision threshold was lowered. NFL historical test counts and sampling bounds remain evidence/price requirements, not automatic unlock timers.
+
+## Complete NFL coverage and offered-market browser
+
+NFL team discovery now also verifies schedules for the previous two regular seasons. Each team/year must return at least 16 completed regular-season games in the requested season before discovery is marked complete. Event IDs are queued once and box scores resume in bounded batches; current rosters and future schedules are retained. The last prior season may enter the comparable season/team forecast. The older season supplies earlier-only replay inputs; it is not silently added to the current forecast. Trades and measured opportunity shifts still exclude incomparable priors. No Lean threshold is reduced.
+
+Historical NFL evidence is stored in separate `evidence.nfl-YYYY.json` snapshots, avoiding an oversized current evidence file. Immutable source objects are cached by their integrity-checked manifest path until that path changes. Research requests only load those NFL history partitions when NFL research is requested.
+
+Daily Picks now includes an All player lines view. It independently lists every player with current full-game offered props for the selected league/book/game, including alternate thresholds outside the shortlist price band. Search, statistic and side controls reveal the exact offered prices and break-even rates. The market browser does not assign a new probability or recommendation. It is separate from the five-Lean/five-watchlist daily shortlist, and full statistical player research remains Pro.
+
+Quote profiles resolve within the actual matchup and by athlete ID before joining historical data. This prevents same-name athletes on other teams from contributing to the selected player’s sample. NFL historical team IDs remain attached to each old game.

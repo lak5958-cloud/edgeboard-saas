@@ -11,14 +11,14 @@ export function summaryTeams(p){
   const fga=total('field goals attempted'),fta=total('free throws attempted'),turnovers=total('turnovers'),orb=total('offensive rebounds'),minutes=total('minutes');
   if(!(minutes>0))return [];
   const stats={};for(const key of ['points','rebounds','assists','3-pointers made','steals','blocks'])if(pp.every(x=>num(x.stats[key])))stats[normalizeStat(key)]=total(key);
-  teams.push({gameID:id,date,seasonYear:seasonYear('NBA',date),teamID:String(competitor.team.id),team:code,points,minutes,fga,fta,turnovers,orb,stats,source:url});
+  teams.push({league:'NBA',seasonType:'regular',gameID:id,date,seasonYear:seasonYear('NBA',date),teamID:String(competitor.team.id),team:code,points,minutes,fga,fta,turnovers,orb,stats,source:url});
  }
  if(teams.length!==2)return [];const possessions=avg(teams.map(t=>t.fga+.44*t.fta-t.orb+t.turnovers));if(!(possessions>0))return [];
  return teams.map((t,i)=>({...t,opponentID:teams[1-i].teamID,allowed:teams[1-i].stats,pointsAllowed:teams[1-i].points,possessions,pace:t.minutes>0?possessions*240/t.minutes:null,defensiveRating:teams[1-i].points/possessions*100}));
 }
 export function observedContext(q,sample,records,context,game,now=new Date()){
  const why=[],risks=[],sources=[];if(q.league!=='NBA'||!sample)return {why,risks,sources};
- const profile=(context.rosters||[]).find(p=>sameName(p.subject,q.player)&&p.league==='NBA')||sample.profile;
+ const profile=sample.profile||(context.rosters||[]).find(p=>sameName(p.subject,q.player)&&p.league==='NBA');
  const teamID=profile?.currentTeamID,year=sample.currentYear,current=sample.rows.filter(g=>g.seasonYear===year&&teamID&&g.teamID===teamID).slice(0,5),mins=current.filter(g=>num(g.minutes)&&g.minutes>0);
  if(mins.length){why.push(`Minutes scenario: ${avg(mins.map(g=>Number(g.minutes))).toFixed(1)} minutes, based on ${mins.length} recent current-team appearances (observed range ${Math.min(...mins.map(g=>g.minutes))}–${Math.max(...mins.map(g=>g.minutes))}). Statistical estimate only; not a confirmed rotation or minutes restriction.`);for(const g of mins)sources.push({label:`Minutes / box score ${g.date}`,url:g.source});}
  const age=(now-Date.parse(context.matchups?.fetchedAt))/3600000,rows=context.matchups?.games||[],fresh=Number.isFinite(age)&&age>=0&&age<=2;

@@ -1,5 +1,5 @@
 import {analyzeTeamSelection,teamSample} from './team-research.mjs';
-import {belongsToGame} from './rosters.mjs';
+import {belongsToGame,quoteProfile,identityRecords} from './rosters.mjs';
 import {observedContext} from './matchups.mjs';
 import {forecast,exactDecision,usableRows} from './prediction.mjs';
 import {contextReadback} from './context.mjs';
@@ -90,8 +90,8 @@ export function matchingOutside(q,experts=[]){return experts.filter(e=>e.league=
  });}
 export function analyzeSelection(q,{game=null,records=[],research=[],experts=[],baseline=null,now=new Date(),maxAge=75,context={}}={}){
  if(q&&['Spread','Moneyline','Total','Team Total'].includes(q.kind))return analyzeTeamSelection(q,{game,context,now,baseline},{quoteStatus,exactDecision,implied});
- let state=quoteStatus(q,game,now,maxAge);const sample=sampleSummary(q,records);
- const roster=(context.rosters||[]).find(p=>p.league===q?.league&&sameName(p.subject,q?.player));
+ let state=quoteStatus(q,game,now,maxAge);const roster=q?quoteProfile(q,game,context.rosters||[]):null;records=identityRecords(records,roster,context.rosters||[]);const sample=sampleSummary(q,records);
+ if(!roster&&(context.rosters||[]).filter(p=>p.league===q?.league&&sameName(p.subject,q?.player)).length>1)state={ok:false,label:'IDENTITY UNVERIFIED',reason:'More than one athlete matches this name and the quoted matchup cannot resolve their identity.'};
  if(roster&&game&&now-Date.parse(roster.asOf)>=0&&now-Date.parse(roster.asOf)<2*3600000&&!belongsToGame(roster,game))state={ok:false,label:'ROSTER CONFLICT',reason:`The quoted player’s current sourced roster (${roster.team}) does not match this game. Refresh the provider/rosters before using the quote.`};const isPlayer=q?.kind==='Player Prop';
  const sourceNotes=research.filter(n=>n.league===q?.league&&(sameName(n.subject,q?.player)||n.subject===q?.game)&&(n.periodID==null||String(n.periodID).toLowerCase()===quotePeriod(q)));
  const relatedExperts=matchingOutside(q,experts), bp=implied(q?.odds),baseP=implied(baseline?.odds),direction=thresholdDirection(q,baseline);
