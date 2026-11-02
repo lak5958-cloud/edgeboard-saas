@@ -42,3 +42,13 @@ The result leads with a default accept/keep lean, reasons and conditions that co
 The collector requests DraftKings and FanDuel together. Each NBA/NFL shortlist is independently screened at that book’s exact quoted thresholds, prices and timestamps; no other books are available in the selector. Published reports use byBook → league. DraftKings-only legacy reports are never relabeled as FanDuel. Missing provider coverage is an explicit empty state. Every displayed quote is checked again for freshness and pregame eligibility at request time.
 
 Cards lead with the player portrait, readable statistic, book/price and matchup. “Why it could hit” uses actual historical counts and averages; “Main risks” translates incomplete checks and role/availability limitations. “Our verdict” preserves Lean or Pass. Detailed model probabilities, expected net, test counts and sources remain expandable. No arbitrary confidence score or invented opponent/usage story is generated. Player headshots use the existing bounded same-origin image route.
+
+## Scoped live research
+
+The Pro Research console uses `/api/research-workspace` rather than downloading all historical series and both leagues each minute. Metadata contains the full game index with book quote counts; quotes and history are scoped to the chosen matchup, with NBA roster-only research retained. Book prices remain exact and only DraftKings/FanDuel are included. Player identity and injury context are restricted to the selected teams.
+
+The browser checks the published snapshot revision every 60 seconds and on returning to the tab. An unchanged revision skips all quote/history downloads. Changed snapshots load in byte-bounded pages, pinning the version across metadata, quotes and histories. A version conflict retries the complete read once. Rapid navigation cancels older reads; failed or unauthorized updates retain the last complete view with an explicit warning. The server retains Pro authorization on every part; provider refresh remains owner-only.
+
+Player, book, side, period and alternate threshold are preserved on background updates. An exact selection that disappears is marked unavailable; another line is not selected silently. The game scanner still runs in its worker with selected-game evidence. Outside-source market jumps first load the requested game, then apply the existing exact-period/line/book checks.
+
+Daily Picks includes a Lean/Pass guide, the experimental outright model win probability beside the name, the scan funnel and a one-market-per-player explanation. The hit chance is not an independently calibrated confidence score. No decision threshold was lowered. NFL historical test counts and sampling bounds remain evidence/price requirements, not automatic unlock timers.
