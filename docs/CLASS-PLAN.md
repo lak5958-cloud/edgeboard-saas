@@ -25,3 +25,16 @@ A proposed $15/month subscription would require 200 paying subscribers for $3,00
 2. Complete verified fantasy coverage and schedule import; connect AI; implement owner cloud collection; test billing in test mode.
 3. Show peers the actual product, log observed failures, improve onboarding, performance, scoring and mobile accessibility.
 4. Recruit five plausible customers and collect honest feedback; verify all rubric requirements, perform the approved live $1 proof, record reflection. Extra credit requires an actual paying customer, not a fabricated testimonial.
+
+## Verified implementation status, November 2, 2026
+
+- Public production: https://edgeboard-saas.vercel.app/ . Home, trade analyzer, daily picks and gated research are deployed. Automatic private odds/stat refresh is active.
+- Statistical research: existing empirical season/team model and decision gates retained. Current-team fantasy scoring, schedule scenarios and incomplete-data warnings are explicit. No independently validated profitability or calibrated future forecast is claimed.
+- Grader: demo@demo.com / password123! exists as a confirmed real Supabase Auth account with permanent grader entitlement. Owner privileges remain separate. Normal deployed login and server authorization are tested; the grader cannot request owner refresh actions.
+- AI: evidence-prioritization code accepts only verified evidence IDs, keeps the calculated recommendation fixed and renders source-derived numbers on the server. OPENAI_API_KEY and AI_MODEL must be added to Vercel Production and redeployed before live AI verification. No canned explanation is presented as a successful AI response.
+- Billing: Stripe keys, price and webhook secret are not configured. Checkout, cancellation, entitlement reconciliation and the student's required live $1 receipt remain unverified. No real payment has been made.
+- Customer launch: support contact and applicable data-feed distribution rights need confirmation. Peer feedback, five real customer tests, income-statement submission and student videos cannot be claimed complete without their actual evidence.
+
+### Evidence-first product policy
+
+The statistical engine supplies scoring and experimental recommendations. AI only prioritizes existing evidence and limitations, never substitutes its own statistics, odds, probabilities, schedule multipliers or betting edges. Schedule pace is a descriptive scenario. The daily shortlist distinguishes Leans from Pass watchlist items. No minimum pick count is forced.
