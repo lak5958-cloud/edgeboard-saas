@@ -25,10 +25,14 @@ Inspect `cron.job` for `edgeboard-refresh` and `net._http_response` for completi
 - NFL missing passing/rushing/receiving/fumbles categories are zero only if the player appears in an offensive box-score table and all required columns in every team category reconcile with source totals. ESPN team passing totals can be net of explicitly reported sack yards; the parser verifies the gross reconciliation. Missing/truncated/conflicting categories fail closed. A roster entry alone never creates a zero-point appearance.
 - Current season, current team, regular season, completed games only. Up to ten scoring appearances, minimum three. No old-team borrowing. No automatic rookie-to-veteran substitution. DNPs and unrecorded zero-stat appearances are not imputed.
 - Output is a descriptive per-appearance average. The next-21-day schedule pace assumes every game is played; it is not an injury-adjusted forecast. Opponent team points allowed and covered position fantasy totals are context only, not fitted multipliers. Covered games may be incomplete while history is filling.
-- Unequal packages require an explicit waiver/drop value from the user. Adjusted difference = receive − send + (players sent − players received) × user replacement points. It is a per-appearance scenario, not weekly lineup optimization.
+- Unequal packages now receive a default starter-based lean: compare the best min(send count, receive count) players on each side, treating extras as bench depth. The user can select that everyone starts, or enter a waiver/drop value. Positional preferences add conditional advice, never numerical scoring bonuses. Adjusted difference = receive − send + (players sent − players received) × user replacement points. It is a per-appearance scenario, not weekly lineup optimization.
 - Current Out/IR/Doubtful/suspended listings trigger availability review. Missing reports do not confirm health. Historical role changes, rest, snap/route participation, starting slots and lineup fit still need review.
 - Bonuses, return TDs, two-point conversions, kickers, IDP, NBA category leagues and dynasty/keeper valuation are not supported. This is an original trade workflow, not a copy of another service's proprietary rankings or methodology.
 
 ## Verification
 
 Tests cover real archived NFL box-score reconciliation, corrupt/truncated categories, fumbles/PPR, old-team exclusions, offensive roster options, unequal trades, injuries, exact alternate prices/timestamps, odds pagination, request-time pick expiry, resumable merging, and unsigned worker denial. Fixture source: ESPN DAL–PHI, game 401772510 (2025-09-05); it is test-only and is never substituted for live data.
+
+## Plain-English trade view
+
+The result leads with a default accept/keep lean, reasons and conditions that could change it. Missing history and unavailable players produce an actionable hold rather than invented scores. Sources, scoring components and schedule details are expandable. ESPN headshots use the verified roster athlete ID and a restricted image host; missing images fall back to initials. No RotoTrade proprietary values or full-league import are used.
