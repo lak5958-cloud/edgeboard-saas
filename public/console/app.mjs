@@ -45,7 +45,7 @@ async function responseJson(response,endpoint){
  return obj;
 }
 async function fetchJson(url){
- if(/^\/data\/evidence(?:\.auto|\.players)?\.json$/.test(url)){const rows=[];let cursor='0';do{const r=await fetch(url+'?cursor='+cursor+'&t='+Date.now(),{cache:'no-store'});const page=await responseJson(r,url);if(!Array.isArray(page))throw Error('Invalid evidence page.');rows.push(...page);cursor=r.headers.get('X-Next-Cursor');}while(cursor);return rows;}
+ if(url==='/data/live-data.json'||/^\/data\/evidence(?:\.auto|\.players)?\.json$/.test(url)){const rows=[];let cursor='0',board=null;do{const r=await fetch(url+'?cursor='+cursor+'&t='+Date.now(),{cache:'no-store'});const page=await responseJson(r,url);const items=url==='/data/live-data.json'?page.quotes:page;if(!Array.isArray(items))throw Error('Invalid research page.');rows.push(...items);if(url==='/data/live-data.json'&&!board)board=page;cursor=r.headers.get('X-Next-Cursor');}while(cursor);return board?{...board,quotes:rows}:rows;}
  const r=await fetch(url+'?t='+Date.now(),{cache:'no-store'});return responseJson(r,url);
 }
 async function verifyRefreshServer(){const h=await fetchJson('/api/health');if(h.version!==expectedServerVersion||h.refreshSupported!==true)throw Error(`Local server version ${h.version||'unknown'} cannot refresh this dashboard. Run Open-Dashboard.ps1 to start v${expectedServerVersion}.`);return h;}
