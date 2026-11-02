@@ -39,3 +39,7 @@ The full hosted research console is read-only. Owner collection still runs in th
 `npm test` runs SaaS scoring/security/handler tests. `npm run check` checks syntax. `node --test legacy-console/*.test.mjs` runs preserved original tests. Auth, Stripe and AI external integrations need end-to-end verification with your accounts. This package is not described as production-ready until the launch checklist passes.
 
 Read docs/HANDOFF.md for Claude/GitHub/Vercel continuation and docs/CLASS-PLAN.md for the assignment map.
+
+## Version 2.1 automatic data and fantasy update
+
+See [Automatic data](docs/AUTOMATIC-DATA.md) for hosted refresh scheduling, the owner-only controls, exact fantasy scoring, schedule context and honest pick screening. No provider keys are stored in this repository. Current-season history backfills in batches without blocking visitors.
