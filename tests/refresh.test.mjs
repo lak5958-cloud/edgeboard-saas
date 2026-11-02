@@ -16,3 +16,16 @@ test('collector resumes from a game queue, retains earlier evidence and is idemp
 test('background refresh requires its secret and rejects unsigned public calls',async()=>{for(const headers of [{},{authorization:'Bearer forged'}]){const req=Readable.from([]);req.url='/api/internal/refresh';req.method='GET';req.headers=headers;let status,body;const res={setHeader(){},set statusCode(x){status=x},end(x){body=JSON.parse(x)}};await handler(req,res);assert.equal(status,401);assert.match(body.error,/authentication/);}});
 
 test('current roster identity follows athlete IDs across name variants and preserves old-game teams',()=>{const records=[{league:'NFL',subject:'Synthetic J.',profile:{id:'1'},games:[{teamID:'old'}]}],rosters=[{league:'NFL',id:'1',subject:'Synthetic Junior',currentTeamID:'new'}];const r=withCurrentProfiles(records,rosters);assert.equal(r[0].profile.currentTeamID,'new');assert.equal(r[0].games[0].teamID,'old');assert.equal(withCurrentProfiles(records,[...rosters,{...rosters[0],currentTeamID:'conflict'}])[0].profile,null);});
+
+test('empty fumble categories require the same team summary to explicitly certify zero lost fumbles',()=>{
+ const p=structuredClone(fixture),t=p.boxscore.players[0],id=String(t.team.id),f=t.statistics.find(s=>s.name==='fumbles');f.totals=[];f.athletes=[];
+ p.boxscore.teams=[{team:{id},statistics:[{name:'fumblesLost',displayValue:'0'}]}];
+ assert(completeFantasyBoxscores(p,'NFL',now).some(r=>r.teamID===id&&r.stats.fumbleslost===0));
+ for(const patch of [x=>x.boxscore.teams[0].team.id='different',x=>x.boxscore.teams[0].statistics[0].displayValue='1',x=>x.boxscore.teams[0].statistics=[]]){const x=structuredClone(p);patch(x);assert(!completeFantasyBoxscores(x,'NFL',now).some(r=>r.teamID===id));}
+});
+test('old completed NFL events are reprocessed once when their fantasy import schema changes',async()=>{
+ const id=String(fixture.header.id),at=now.toISOString(),d={rosters:[],autoRecords:[],fantasyLogs:[],context:{injuries:[],teamGames:[]},schedule:{games:[]}},state={NBATeamsAt:at,NFLTeamsAt:at,events:{['NFL|'+id]:{league:'NFL',gameID:id,date:'2026-09-01',done:true,checkedAt:at,fantasySchemaVersion:1}}};
+ const r=await collectSports(d,state,{now,maxEvents:1,get:async u=>u.includes('/injuries')?{injuries:[]}:structuredClone(fixture)});
+ assert.equal(r.processed,1);assert.equal(r.state.events['NFL|'+id].fantasySchemaVersion,2);assert.equal(r.state.pending,0);
+ const again=await collectSports({...d,autoRecords:r.updates['evidence.auto.json'],fantasyLogs:r.updates['fantasy-game-logs.json']},r.state,{now,maxEvents:1,get:async()=>({injuries:[]})});assert.equal(again.processed,0);
+});
