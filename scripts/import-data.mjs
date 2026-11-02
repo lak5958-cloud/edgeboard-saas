@@ -1,0 +1,5 @@
+import fs from 'node:fs/promises';import path from 'node:path';import {sb} from '../lib/cloud.mjs';
+// Never traverse config, key files, log files or quote archives. Explicit snapshot allowlist only.
+const root=process.argv[2];if(!root)throw Error('Usage: npm run import:data -- "C:\\path\\to\\installed-console\\data"');
+const files=['live-data.json','evidence.json','evidence.auto.json','evidence.players.json','roster-cache.json','context.auto.json','team-history.json','matchups.auto.json','model-report.json','validation-report.json','historical-report.json','stat-sync-status.json','player-history-status.json','future-schedule.json','fantasy-game-logs.json'];
+for(const file of files){let bytes;try{bytes=await fs.readFile(path.join(root,file))}catch(e){if(e.code==='ENOENT'){console.log(file+': absent, skipped');continue;}throw e;}JSON.parse(bytes);await sb('/storage/v1/object/edgeboard/'+file,{method:'POST',headers:{'Content-Type':'application/json','x-upsert':'true'},body:bytes});console.log(file+': uploaded');}
