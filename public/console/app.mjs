@@ -1,3 +1,4 @@
+import {createWorkspaceReader} from './workspace-loader.mjs';
 import {normalizeBoardMarkets} from './board-markets.mjs';
 import {noVigIndex,evidenceIndex,singleFlight} from './browser-performance.mjs';
 import {mountEvaluation} from './evaluation-ui.mjs';
@@ -12,8 +13,8 @@ let data={games:[],quotes:[],mode:'SCHEDULE_ONLY'},notes=[],experts=[],evidence=
 let playerRecordsFor=()=>[];const recordsFor=q=>q?.kind==='Player Prop'?playerRecordsFor(q):[];
 let historicalReport={},historicalLoadError='';
 let evaluationLoadError='';
-let dataRevision=0,picksPreviouslyActive=false;
-let evidenceLoadError="", refreshRunning=false;
+let dataRevision=0,picksPreviouslyActive=false,preserveSelection=false,workspaceVersion=null,workspaceKey='',workspaceBusy=false,loadSerial=0;
+let evidenceLoadError="", refreshRunning=false,ownerAllowed=false;
 let league='NBA',game='',kindWanted='Player Prop',subject='',stat='',period='',side='',book='draftkings',selectedLine=null,focusPanel='research',activeQuotes=[];
 const $=s=>document.getElementById(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
@@ -26,7 +27,7 @@ const gameCode=g=>g?.game||'';
 const marketLabel=q=>q.kind==='Moneyline'?`${q.side.toUpperCase()} MONEYLINE`:q.kind==='Spread'?`${q.side.toUpperCase()} ${Number(q.line)>0?'+':''}${q.line}`:`${q.side.toUpperCase()} ${q.line}`;
 const selectedGame=()=>data.games.find(g=>g.league===league&&g.game===game);
 function parseCsv(input){let row=[],field='',quoted=false,rows=[];for(let i=0;i<input.length;i++){const c=input[i];if(c==='"'){if(quoted&&input[i+1]==='"'){field+='"';i++;}else quoted=!quoted;}else if(c===','&&!quoted){row.push(field);field='';}else if((c==='\r'||c==='\n')&&!quoted){if(c==='\r'&&input[i+1]==='\n')i++;row.push(field);if(row.some(Boolean))rows.push(row);row=[];field='';}else field+=c;}if(field||row.length){row.push(field);rows.push(row);}return rows.length?rows.slice(1).map(r=>Object.fromEntries(rows[0].map((h,i)=>[h,r[i]||'']))):[];}
-function selectValues(id,values,preferred){const el=$(id);el.replaceChildren();if(!values.length){el.append(new Option('Not available',''));return '';}for(const v of values)el.append(new Option(v,v));const choose=values.includes(preferred)?preferred:values[0];el.value=choose;return choose;}
+function selectValues(id,values,preferred){const el=$(id);el.replaceChildren();if(!values.length){if(preserveSelection&&preferred){el.append(new Option(preferred+' · no longer quoted',preferred));el.value=preferred;return preferred;}el.append(new Option('Not available',''));return '';}for(const v of values)el.append(new Option(v,v));if(preserveSelection&&preferred&&!values.includes(preferred)){el.append(new Option(preferred+' · no longer quoted',preferred));el.value=preferred;return preferred;}const choose=values.includes(preferred)?preferred:values[0];el.value=choose;return choose;}
 function dataset(){return Array.isArray(data.quotes)?data.quotes:[];}
 function gamesInLeague(){return data.games.filter(g=>g.league===league);}
 function gameQuotes(){return dataset().filter(q=>q.league===league&&q.game===game);}
@@ -37,10 +38,10 @@ const picksView=mountGamePicks({getInput:()=>({game:selectedGame(),quotes:datase
 async function responseJson(response,endpoint){
  const body=await response.text();const contentType=String(response.headers.get('content-type')||'').toLowerCase();
  if(!contentType.includes('application/json')){
-  if(response.status===404||/^not found$/i.test(body.trim()))throw Error(`This dashboard is connected to an older local EdgeBoard server (HTTP ${response.status} at ${endpoint}). Restart Open-Dashboard.ps1 from your installed EdgeBoard_Research_Console_NBA_NFL folder. Your key and data are safe.`);
-  throw Error(`${endpoint}: HTTP ${response.status}; expected JSON, received ${contentType||'plain text'}. Check the local server.`);
+  if(response.status===404||/^not found$/i.test(body.trim()))throw Error(`The research service could not find ${endpoint}. Reload the page to use the latest version.`);
+  throw Error(`${endpoint}: HTTP ${response.status}; expected JSON, received ${contentType||'plain text'}. The last complete view is retained.`);
  }
- let obj;try{obj=JSON.parse(body)}catch{throw Error(`${endpoint}: malformed JSON from the local server (HTTP ${response.status}).`)}
+ let obj;try{obj=JSON.parse(body)}catch{throw Error(`${endpoint}: unreadable JSON from the research service (HTTP ${response.status}).`)}
  if(!response.ok)throw Error(obj?.error||`${endpoint}: HTTP ${response.status}`);
  return obj;
 }
@@ -48,20 +49,25 @@ async function fetchJson(url){
  if(url==='/data/live-data.json'||/^\/data\/evidence(?:\.auto|\.players)?\.json$/.test(url)){const rows=[];let cursor='0',board=null;do{const r=await fetch(url+'?cursor='+cursor+'&t='+Date.now(),{cache:'no-store'});const page=await responseJson(r,url);const items=url==='/data/live-data.json'?page.quotes:page;if(!Array.isArray(items))throw Error('Invalid research page.');rows.push(...items);if(url==='/data/live-data.json'&&!board)board=page;cursor=r.headers.get('X-Next-Cursor');}while(cursor);return board?{...board,quotes:rows}:rows;}
  const r=await fetch(url+'?t='+Date.now(),{cache:'no-store'});return responseJson(r,url);
 }
-async function verifyRefreshServer(){const h=await fetchJson('/api/health');if(h.version!==expectedServerVersion||h.refreshSupported!==true)throw Error(`Local server version ${h.version||'unknown'} cannot refresh this dashboard. Run Open-Dashboard.ps1 to start v${expectedServerVersion}.`);return h;}
+async function verifyRefreshServer(){const h=await fetchJson('/api/health');if(h.version!==expectedServerVersion||h.refreshSupported!==true)throw Error('The deployed research service is not compatible with this view. Reload the page before requesting a refresh.');return h;}
 
 async function optionalJson(file,empty=[]){try{return await fetchJson(file)}catch(err){if(file==='/data/evidence.auto.json')evidenceLoadError=err.message;if(file==='/api/model-report-summary')evaluationLoadError=err.message;if(file==='/data/historical-report.json')historicalLoadError=err.message;return empty}}
-const load=singleFlight(async()=>{try{evidenceLoadError='';evaluationLoadError='';historicalLoadError='';
- const [d,n,e,v,nu,eu,vu,st,ctx,factors,mr,players,ph,rc,mu,va,hr,th]=await Promise.all([fetchJson('/data/live-data.json'),fetchJson('/data/research.json'),fetch('/data/expert-picks.csv?t='+Date.now(),{cache:'no-store'}),fetchJson('/data/evidence.json'),optionalJson('/data/research.user.json'),optionalJson('/data/outside-picks.user.json'),optionalJson('/data/evidence.auto.json'),optionalJson('/data/stat-sync-status.json',{}),optionalJson('/data/context.auto.json',{}),optionalJson('/data/context.user.json',{}),optionalJson('/api/model-report-summary',{}),optionalJson('/data/evidence.players.json'),optionalJson('/data/player-history-status.json',{}),optionalJson('/data/roster-cache.json'),optionalJson('/data/matchups.auto.json',{}),optionalJson('/data/validation-report.json',{}),optionalJson('/data/historical-report.json',{}),optionalJson('/data/team-history.json',{games:[]})]);
- if(!e.ok)throw Error('Cannot load expert audit');const ex=parseCsv(await e.text());if(!Array.isArray(d.games)||!Array.isArray(d.quotes))throw Error('Market snapshot is malformed');
- d.games=d.games.map((g,i)=>Array.isArray(g)?{league:g[0],game:g[1],away:g[2],home:g[3],start:g[4],eventID:'schedule-'+i,status:'Scheduled'}:g);
- d.quotes=normalizeBoardMarkets(d).quotes;
- const lookup=noVigIndex(d.quotes);for(const q of d.quotes)q.noVigProb=lookup(q);data=d;dataRevision++;notes=[...(Array.isArray(n)?n:[]),...(Array.isArray(nu)?nu:[])];experts=[...ex,...(Array.isArray(eu)?eu:[])];evidence=[...(Array.isArray(v)?v:[]),...(Array.isArray(vu)?vu:[]),...(Array.isArray(players)?players:[])];playerRecordsFor=evidenceIndex(evidence);playerHistory=ph;rosters=Array.isArray(rc)?rc:[];statSync=st;context={rosters,teamGames:th.games||[],teamHistoryStatus:th,matchups:mu,injuries:Array.isArray(ctx.injuries)?ctx.injuries:[],factors:Array.isArray(factors.factors)?factors.factors:[]};historicalReport=hr;evaluationView.render();modelReport={...mr,policyComparison:va};$('picksValidation').innerHTML=renderValidationProgress(modelReport,evaluationLoadError);render();return true;
- }catch(err){$('warn').classList.remove('ok');$('warn').textContent=`Snapshot could not load: ${err.message}. Your existing key and saved data have not been changed.`;return false;}
-});
+const readWorkspace=createWorkspaceReader(async(url,{signal})=>{const r=await fetch(url,{cache:'no-store',signal});let result;try{result=await r.json()}catch{throw Error('The research service returned an unreadable response. Your previous view is retained.');}if(!r.ok)throw Object.assign(Error(result.error||'Research could not load.'),{status:r.status});return result;});
+async function load(force=false){const id=++loadSerial,key=league+'|'+game,keepSelection=workspaceKey===key&&!!workspaceVersion;workspaceBusy=true;$('syncStatus').textContent='Checking published data…';
+ try{const result=await readWorkspace({league,game,force:!!force,knownVersion:keepSelection?workspaceVersion:null});if(!result||id!==loadSerial)return false;
+  if(result.unchanged){if(picksView.active)picksView.update();else showQuote();const fresh=dataset().filter(q=>q.league===league&&q.book==='draftkings'&&hasCurrent(q));$('dataIntegrity').textContent=fresh.length?`${fresh.length} verified DraftKings quotes`:'No current DraftKings prices';$('freshState').textContent=fresh.length?'Price and timestamp checked · models not calibrated':'Missing, stale, closed or started; wait for current prices';$('syncStatus').textContent='Up to date · checked '+new Date().toLocaleTimeString();return true;}
+  const d=result.board;if(!Array.isArray(d.games)||!Array.isArray(d.quotes)||!Array.isArray(result.records))throw Error('The research snapshot is incomplete.');
+  d.quotes=normalizeBoardMarkets(d).quotes;const lookup=noVigIndex(d.quotes);for(const q of d.quotes)q.noVigProb=lookup(q);
+  // Publish all browser state together only after both paged collections agree on the version.
+  data=d;game=result.scope.game||'';dataRevision++;notes=result.notes||[];experts=result.experts||[];evidence=result.records;playerRecordsFor=evidenceIndex(evidence);playerHistory=result.playerHistory||{};rosters=result.rosters||[];statSync=result.statSync||{};context={...result.context,rosters};historicalReport=result.historicalReport||{};modelReport=result.modelReport||{};evidenceLoadError='';evaluationLoadError='';historicalLoadError='';workspaceVersion=result.version;workspaceKey=league+'|'+game;
+  preserveSelection=keepSelection;try{evaluationView.render();$('picksValidation').innerHTML=renderValidationProgress(modelReport,evaluationLoadError);render();}finally{preserveSelection=false;}
+  $('syncStatus').textContent='Live updates on · loaded '+new Date().toLocaleTimeString();$('refreshFeedback').textContent=`Latest published data loaded. ${evidence.length} stat series for this matchup; other games load when selected. Next change check within 60 seconds.`;return true;
+ }catch(err){if(id!==loadSerial)return false;$('syncStatus').textContent='Update failed · previous data retained';$('warn').classList.remove('ok');$('warn').textContent=(err.status===401||err.status===403?'Your Research session needs sign-in. Open the Account page and sign in again. ':`Update could not load: ${err.message}. `)+'The last complete view remains visible; check quote timestamps.';return false;}
+ finally{if(id===loadSerial)workspaceBusy=false;}
+}
 
-function switchLeague(next){league=next;game='';subject='';stat='';period='';side='';book='draftkings';selectedLine=null;$('gameSearch').value='';$('marketSearch').value='';render();}
-function switchGame(next){game=next;subject='';stat='';period='';side='';book='draftkings';selectedLine=null;$('marketSearch').value='';render();}
+function switchLeague(next){league=next;game='';subject='';stat='';period='';side='';book='draftkings';selectedLine=null;$('gameSearch').value='';$('marketSearch').value='';void load(true);}
+function switchGame(next){game=next;subject='';stat='';period='';side='';book='draftkings';selectedLine=null;$('marketSearch').value='';void load(true);}
 function render(){
  const gs=gamesInLeague();if(!gs.some(x=>x.game===game))game=gs[0]?.game||'';
  for(const l of ['nba','nfl'])$(l).classList.toggle('active',l.toUpperCase()===league);
@@ -70,14 +76,14 @@ function render(){
  $('mode').textContent=live?'PROVIDER SNAPSHOT':'SCHEDULE ONLY';$('updated').textContent='Saved '+dt(data.generatedAt);$('statusDot').style.background=fresh.length?'#48d7ad':'#e8b56f';
  $('gamesTotal').textContent=gs.length;$('marketsTotal').textContent=dq.length;$('altsTotal').textContent=dq.filter(q=>q.alt&&hasCurrent(q)).length;
  $('dataIntegrity').textContent=fresh.length?`${fresh.length} verified DraftKings quotes`:'No verified DraftKings prices';$('freshState').textContent=fresh.length?'Price and timestamp checked · models not calibrated':'Missing, stale or unavailable until refreshed';
- $('warn').textContent=data.message||(live?'Saved provider data: check each quote timestamp and availability.':'No connected live quote in this folder. Run Refresh-Now.ps1 in Windows to populate offered lines.');$('warn').classList.toggle('ok',live&&fresh.length>0);
+ $('warn').textContent=data.message||(live?'Saved provider data: check each quote timestamp and availability.':'No published live quotes are available. The server checks the provider on its scheduled refresh.');$('warn').classList.toggle('ok',live&&fresh.length>0);
  renderGames();refreshSelectors();renderMarket();picksView.update();
 }
 function renderGames(){
  const term=$('gameSearch').value.trim().toLowerCase(),gs=gamesInLeague().filter(g=>(g.game+' '+(g.home||'')+' '+(g.away||'')).toLowerCase().includes(term));
  $('shownGames').textContent=`${gs.length}/${gamesInLeague().length}`;
  $('games').innerHTML=gs.length?gs.map(g=>{
-  const n=dataset().filter(q=>q.league===league&&q.game===g.game&&q.book==='draftkings'&&hasCurrent(q)).length;
+  const n=g.quoteCounts?.draftkings?.current??dataset().filter(q=>q.league===league&&q.game===g.game&&q.book==='draftkings'&&hasCurrent(q)).length;
   const s=g.game.split(' @ ');return `<button class="game ${g.game===game?'active':''}" data-game="${esc(g.game)}"><div class="gameTitle"><span>${esc(s[0]||g.away)} <span style="color:#8996a1">@</span> ${esc(s[1]||g.home)}</span><strong>${n?n+' DK':'—'}</strong></div><div class="gameMeta"><span>${esc(dt(g.start))}</span><span>${esc(g.status||'Scheduled')}</span></div></button>`;}).join(''):'<div class="empty">No games match this search.</div>';
  $('games').querySelectorAll('.game').forEach(b=>b.addEventListener('click',()=>switchGame(b.dataset.game)));
  const g=selectedGame();$('matchup').textContent=g?.game||'Choose a game';$('matchMeta').textContent=g?`${dt(g.start)} · ${g.status||'Scheduled'}`:'No games returned';
@@ -119,15 +125,15 @@ function refreshSelectors(){
  for(const b of document.querySelectorAll('[data-kind]'))b.classList.toggle('active',b.dataset.kind===kindWanted);
 }
 function selectOptions(id,items,preferred){
- const el=$(id);el.replaceChildren();if(!items.length){el.append(new Option('Not available',''));return ''}
+ const el=$(id);el.replaceChildren();if(!items.length){if(preserveSelection&&preferred){el.append(new Option(preferred+' · no longer quoted',preferred));el.value=preferred;return preferred;}el.append(new Option('Not available',''));return ''}
  for(const item of items)el.append(new Option(item.label,item.value));
- const choose=items.some(x=>x.value===preferred)?preferred:items[0].value;el.value=choose;return choose;
+ if(preserveSelection&&preferred&&!items.some(x=>x.value===preferred)){el.append(new Option(preferred+' · no longer quoted',preferred));el.value=preferred;return preferred;}const choose=items.some(x=>x.value===preferred)?preferred:items[0].value;el.value=choose;return choose;
 }
 function selectedQuotes(){return gameQuotes().filter(q=>q.kind===kindWanted&&(kindWanted==='Player Prop'?sameName(q.player,subject):q.player===subject)&&q.stat===stat&&quotePeriod(q)===period&&q.side===side&&q.book===book).sort((a,b)=>Number(a.line)-Number(b.line));}
 function distinctLines(qs){return latestQuotes(qs).sort((a,b)=>Number(a.line)-Number(b.line));}
 function standard(qs){return qs.find(q=>!q.alt)||qs[Math.floor(qs.length/2)]||null;}
 function renderMarket(){activeQuotes=distinctLines(selectedQuotes());const main=standard(activeQuotes);
- if(!activeQuotes.some(q=>String(q.line)===String(selectedLine)))selectedLine=main?.line??null;
+ if(selectedLine===null||(!preserveSelection&&!activeQuotes.some(q=>String(q.line)===String(selectedLine))))selectedLine=main?.line??null;
  const i=activeQuotes.findIndex(q=>String(q.line)===String(selectedLine));$('slider').max=String(Math.max(0,activeQuotes.length-1));$('slider').value=String(Math.max(0,i));$('slider').disabled=activeQuotes.length<2;
  $('prevAlt').disabled=i<=0;$('nextAlt').disabled=i<0||i>=activeQuotes.length-1;
  $('minline').textContent=kindWanted==='Moneyline'?'Win the game':activeQuotes.length?activeQuotes[0].line:'—';$('maxline').textContent=activeQuotes.length?activeQuotes[activeQuotes.length-1].line:'—';$('altCount').textContent=kindWanted==='Moneyline'?'Exact offered moneyline price':activeQuotes.length?`${activeQuotes.length} distinct quoted thresholds`:'No market thresholds available';
@@ -142,9 +148,9 @@ function showQuote(){const q=activeQuotes.find(x=>String(x.line)===String(select
  $('marketLabel').textContent=q?`${q.alt?'ALTERNATE':'STANDARD'} · ${String(q.kind).toUpperCase()} · ${periodLabel(quotePeriod(q)).toUpperCase()} · ${String(q.book).toUpperCase()}`:'Awaiting SportsGameOdds quotes';
  const an=q?analyzeSelection(q,{game:g,records:recordsFor(q),research:notes,experts,context,baseline}):null;
  $('state').textContent=an?.state.label||'NO DATA';$('state').classList.toggle('open',!!an?.state.ok);
- $('implied').textContent=an?pct(an.breakEven):'—';$('novig').textContent=q&&Number.isFinite(Number(q.noVigProb))&&q.noVigProb!==null?pct(q.noVigProb):'—';
+ $('implied').textContent=an?pct(an.breakEven):'—';$('novig').textContent=q&&hasCurrent(q)&&Number.isFinite(Number(q.noVigProb))&&q.noVigProb!==null?pct(q.noVigProb):'—';
  $('observed').textContent=an?.sample?`${an.sample.hits}/${an.sample.n}`:'—';$('sampleMeta').textContent=an?.sample?`${an.sample.n} verified regular-season games · current ${an.sample.current.n}; prior ${an.sample.previous.n}`:'No audited regular-season logs';
- $('guidance').textContent=an?`${an.decision.label} ${q.side} ${q.kind==='Moneyline'?'moneyline':q.line} at ${odds(q.odds)}. ${an.decision.blockers?.length?an.decision.blockers.length+' unmet or unverified Lean requirements; see Evidence Readback.':an.decision.reason}`:'No actual sportsbook price loaded. Run the Windows refresh task; this screen never substitutes old published odds for live lines.';$('guidance').classList.toggle('ok',!!an?.state.ok);
+ $('guidance').textContent=an?`${an.decision.label} ${q.side} ${q.kind==='Moneyline'?'moneyline':q.line} at ${odds(q.odds)}. ${an.decision.blockers?.length?an.decision.blockers.length+' unmet or unverified Lean requirements; see Evidence Readback.':an.decision.reason}`:'No actual sportsbook price is available for this selection. Published quotes update automatically; a missing market is not replaced with a different bet.';$('guidance').classList.toggle('ok',!!an?.state.ok);
  $('evidenceGrade').textContent=an?`${an.evidenceScore}/10`:'—/10';$('readbackSelection').textContent=q?`${q.player==='GAME'?g.game:q.player} · ${marketDescription(q)} · ${marketLabel(q)}`:'No market selected';$('readbackDate').textContent=q?dt(q.asOf):'—';
  list('reasons',an?.why||['No live quote yet. Use the verified provider quote and a dated stat sample before analyzing a threshold.']);
  list('risks',an?.risks||['The sportsbook, player status, matchup and model inputs have not been verified.']);
@@ -153,9 +159,9 @@ function showQuote(){const q=activeQuotes.find(x=>String(x.line)===String(select
  $('histMean').textContent=an?.sample?an.sample.mean.toFixed(1):'—';$('histSd').textContent=an?.sample?.sd!=null?an.sample.sd.toFixed(1):'—';$('histRange').textContent=an?.sample?`${an.sample.selection?.unit?an.sample.selection.unit+' · ':''}Range ${an.sample.min}–${an.sample.max}`:'Sourced game logs needed';
  $('trend').innerHTML=an?.sample?an.sample.rows.slice(0,10).map(r=>{const h=(r.settlement===0?null:r.settlement===1?true:r.settlement===-1?false:r.value===Number(q.line)?null:q.side==='over'?r.value>q.line:r.value<q.line);return `<div class="${h===null?'push':h?'hit':'miss'}" title="${esc(r.date||'date unknown')} · ${esc(r.opponent||'opponent unknown')} · ${esc(r.seasonYear)} regular season">${esc(r.value)}<small>${esc((r.date||'last').slice(5)||'—')} · ${esc(r.seasonYear)}</small></div>`}).join(''):'<div class="micro">No game outcomes with verified regular-season tags. Refresh statistical history.</div>';
  const coverage=q?.kind==='Player Prop'?evidenceCoverage(q,evidence,evidenceLoadError):null;
- $('coverageStatus').textContent=coverage?`Stats loaded: ${coverage.totalSeries} series · selected player: ${coverage.playerSeries} · exact market: ${coverage.exactSeries} · dated games: ${coverage.gameCount}. ${coverage.message}`:'Choose a player and statistic to check imported game-log coverage.';
- if(q?.kind==='Player Prop'&&['NBA','NFL'].includes(q?.league)){const ps=playerHistory.players?.[q.league+'|'+q.player]||(q.league==='NBA'?playerHistory.players?.[q.player]:null);$('coverageStatus').textContent+=ps?` Player feed: ${ps.status}; current ${ps.currentGames??'unknown'}, prior ${ps.priorGames??'unknown'} appearances; checked ${ps.checkedAt}.`:' Player-specific history will load automatically for this selection.';}
- if(q&&q.kind!=='Player Prop')$('coverageStatus').textContent=an?.sample?`Team history: ${an.sample.n} sourced outcomes, ${an.sample.current.n} current and ${an.sample.previous.n} prior. Metric: ${an.sample.selection.unit}.`:'No sourced team sample for this game/market. Complete Refresh live data or run Build-Team-History.ps1.';
+ $('coverageStatus').textContent=coverage?`Stats loaded: ${coverage.totalSeries} series · selected player: ${coverage.playerSeries} · exact market: ${coverage.exactSeries} · dated games: ${coverage.gameCount}. ${coverage.message.replace(/Run Update-Stats\.ps1.*$/,'Scheduled server collection retries missing verified games. Check the next published update.')}`:'Choose a player and statistic to check imported game-log coverage.';
+ if(q?.kind==='Player Prop'&&['NBA','NFL'].includes(q?.league)){const ps=playerHistory.players?.[q.league+'|'+q.player]||(q.league==='NBA'?playerHistory.players?.[q.player]:null);$('coverageStatus').textContent+=ps?` Player feed: ${ps.status}; current ${ps.currentGames??'unknown'}, prior ${ps.priorGames??'unknown'} appearances; checked ${ps.checkedAt}.`:' History is scoped to this matchup and updates with new published snapshots.';}
+ if(q&&q.kind!=='Player Prop')$('coverageStatus').textContent=an?.sample?`Team history: ${an.sample.n} sourced outcomes, ${an.sample.current.n} current and ${an.sample.previous.n} prior. Metric: ${an.sample.selection.unit}.`:'No verified team sample is available for this market. Scheduled server collection retains older evidence and retries missing games.';
  if(statSync?.status==='error')$('coverageStatus').textContent+=` Importer status: ${statSync.message||'failed'}.`;
  const ladder=q?lineLadder(q,activeQuotes,recordsFor(q),q.kind==='Player Prop'?null:{game:g,games:context.teamGames}):[];
  $('lineLadder').innerHTML=ladder.length?`<table><thead><tr><th>LINE</th><th>PRICE</th><th>BREAK EVEN</th><th>RECENT HITS</th></tr></thead><tbody>${ladder.map(x=>`<tr class="${String(x.line)===String(q.line)?'selected':''}"><td>${esc(q.side.toUpperCase())} ${esc(x.line)}</td><td>${esc(odds(x.odds))}</td><td>${esc(pct(x.breakEven))}</td><td>${x.hits===null?'—':`${x.hits}/${x.n}`}</td></tr>`).join('')}</tbody></table>`:'<div class="micro">No priced alternate-line ladder for this selection.</div>';
@@ -189,7 +195,7 @@ function researchOverview(q,an){if(q?.researchOnly){const sample=an?.sample;retu
  else r+=`<p>No settled archived-price evaluations are available in the loaded report. See Frozen pregame evaluation below the final decision for pending counts or report-loading errors. No verified betting edge is claimed.</p>`;
  if(an?.context?.sources?.length)r+=an.context.sources.map(s=>{const u=safeHref(s.url);return u?`<p><a href="${u}" target="_blank" rel="noopener noreferrer">${esc(s.label)} ↗</a></p>`:''}).join('');
  if(an?.sample)r+=`<details><summary>Statistical evidence citations (${an.sample.rows.length} games)</summary>${an.sample.rows.map(g=>{const u=safeHref(g.source||an.sample.evidence.url);return `<p>${esc(g.date)} · ${esc(g.value)} ${u?`<a href="${u}" target="_blank" rel="noopener noreferrer">Box score ↗</a>`:'Source unavailable'}</p>`}).join('')}</details>`;
- if(q&&q.kind!=='Player Prop')$('coverageStatus').textContent=an?.sample?`Team history: ${an.sample.n} sourced outcomes, ${an.sample.current.n} current and ${an.sample.previous.n} prior. Metric: ${an.sample.selection.unit}.`:'No sourced team sample for this game/market. Complete Refresh live data or run Build-Team-History.ps1.';
+ if(q&&q.kind!=='Player Prop')$('coverageStatus').textContent=an?.sample?`Team history: ${an.sample.n} sourced outcomes, ${an.sample.current.n} current and ${an.sample.previous.n} prior. Metric: ${an.sample.selection.unit}.`:'No verified team sample is available for this market. Scheduled server collection retains older evidence and retries missing games.';
  if(statSync?.status==='error')r+=`<p class="auditTag">Stats enrichment warning: ${esc(statSync.message||'Unknown error')}</p>`;
  r+=`<p class="sourceMeta">Changing the slider updates this exact price, threshold, hit count, and outside-pick alignment. Historical outcomes are descriptive, not calibrated predictions.</p></article>`;
  return r;
@@ -204,13 +210,14 @@ function renderDesk(q,an){
  const pickScope=e=>e.league===league&&(scope==='league'||scope==='game'&&e.game===game||scope==='selection'&&(e.game===game&&(!q||sameName(e.subject,q.player)||q.player==='GAME')));
  const matchTerm=n=>!term||Object.values(n).join(' ').toLowerCase().includes(term);
  const relevant=notes.filter(n=>noteScope(n)&&matchTerm(n));
- $('research').innerHTML=researchOverview(q,an)+ (relevant.length?relevant.map(sourceCard).join(''):`<div class="empty">No matching sourced research note for this ${esc(scope)}. Unlike the old version, unrelated players aren't shown as substitutes. Add a research note below or change the scope to inspect other players.</div>`);
+ $('research').innerHTML=researchOverview(q,an)+ (relevant.length?relevant.map(sourceCard).join(''):`<div class="empty">No matching sourced research note for this ${esc(scope)}. Linked notes appear here when available. Change the scope to inspect other players; unrelated notes are not substituted as evidence.</div>`);
  const outside=experts.filter(e=>pickScope(e)&&matchTerm(e)).sort((a,b)=>String(b.published_utc||b.saved_utc||'').localeCompare(String(a.published_utc||a.saved_utc||'')));
  const exact=outside.filter(e=>q&&sameName(e.subject,q.player)&&sameStat(e.market,q.stat)&&e.side?.toLowerCase()===q.side?.toLowerCase()&&String(e.periodID||'unknown')===quotePeriod(q)&&Number(e.line)===Number(q.line)).length;
- $('experts').innerHTML=`<div class="noticeInline">${outside.length} sourced opinions in view · ${exact} match this exact line. Posts are attributed opinions; no automatic confidence boost. Private Discord, Instagram, and X posts require a link or user-submitted record.</div>`+(outside.length?outside.map(e=>pickCard(e,q)).join(''):'<div class="empty">No outside picks meet the current scope/search. Add one with an original post link below or select the entire league.</div>');
- $('experts').querySelectorAll('[data-jump-pick]').forEach(btn=>btn.onclick=()=>{
-  const result=findBoardMarket({eventID:btn.dataset.jumpEvent,league:btn.dataset.jumpLeague,game:btn.dataset.jumpGame,subject:btn.dataset.jumpPick,market:btn.dataset.jumpStat,side:btn.dataset.jumpSide,periodID:btn.dataset.jumpPeriod,line:btn.dataset.jumpLine,book:btn.dataset.jumpBook},{quotes:dataset(),games:data.games,preferredBook:book||'draftkings'});
-  const target=btn.parentElement.querySelector('.findFeedback');target.replaceChildren();const message=document.createElement('p');message.textContent=result.message;target.append(message);
+ $('experts').innerHTML=`<div class="noticeInline">${outside.length} sourced opinions in view · ${exact} match this exact line. Posts are attributed opinions; no automatic confidence boost. Private Discord, Instagram, and X posts require a link or user-submitted record.</div>`+(outside.length?outside.map(e=>pickCard(e,q)).join(''):'<div class="empty">No outside picks meet the current scope/search. Select the entire league to inspect other published source notes.</div>');
+ $('experts').querySelectorAll('[data-jump-pick]').forEach(btn=>btn.onclick=async()=>{
+  const pick={eventID:btn.dataset.jumpEvent,league:btn.dataset.jumpLeague,game:btn.dataset.jumpGame,subject:btn.dataset.jumpPick,market:btn.dataset.jumpStat,side:btn.dataset.jumpSide,periodID:btn.dataset.jumpPeriod,line:btn.dataset.jumpLine,book:btn.dataset.jumpBook};const g=data.games.find(g=>g.league===pick.league&&(pick.eventID?g.eventID===pick.eventID:g.game===pick.game));if(g&&(g.league!==league||g.game!==game)){league=g.league;game=g.game;subject='';stat='';period='';side='';selectedLine=null;if(!await load(true))return;}
+  const result=findBoardMarket(pick,{quotes:dataset(),games:data.games,preferredBook:book||'draftkings'});
+  const target=btn.isConnected?btn.parentElement.querySelector('.findFeedback'):$('marketJumpStatus');target.classList.remove('hidden');target.replaceChildren();const message=document.createElement('p');message.textContent=result.message;target.append(message);
   if(result.status==='matched'){openBoardQuote(result.quote,quoteIdentity(result.quote),result.message);return;}
   for(const candidate of result.alternatives){const choice=document.createElement('button');choice.type='button';choice.className='findChoice';choice.textContent=`Inspect ${candidate.game} · ${candidate.kind} · ${periodLabel(quotePeriod(candidate))} · ${candidate.side} ${candidate.line} · ${odds(candidate.odds)} · ${candidate.book}${hasCurrent(candidate)?'':' · stale/closed'}`;choice.onclick=()=>openBoardQuote(candidate,quoteIdentity(candidate),'Opened the explicitly selected alternative. It is not assumed to be the same bet as the source post.');target.append(choice);}
  });
@@ -223,7 +230,7 @@ function renderDesk(q,an){
 }
 function refreshMessage(message,isError=false,busy=false){
  const el=$('refreshFeedback');el.textContent=message;el.classList.toggle('error',isError);el.classList.toggle('busy',busy);
- $('reload').disabled=busy;$('reload').querySelector('span').textContent=busy?'Updating…':'Refresh live data';
+ $('reload').disabled=busy||!ownerAllowed;$('reload').querySelector('span').textContent=busy?'Updating…':'Refresh live data';
 }
 async function pollRefresh(){
  let done=false;
@@ -241,7 +248,7 @@ async function pollRefresh(){
  if(!done)refreshMessage('Refresh is still pending. Check Owner controls on the Account page. Your published data is retained.',true,false);
  refreshRunning=false;
 }
-$('reloadSaved').addEventListener('click',async()=>{refreshMessage('Reading saved market and game-log files…');const loaded=await load();if(!loaded){refreshMessage('Saved snapshot reload failed. Read the page warning for the exact file problem.',true,false);return;}refreshMessage(`Saved snapshot reloaded at ${new Date().toLocaleTimeString()}. ${evidence.length} stat series loaded. ${evidenceLoadError?'Game-log warning: '+evidenceLoadError:'No provider request was made.'}`);});
+$('reloadSaved').addEventListener('click',async()=>{refreshMessage('Reading saved market and game-log files…');const loaded=await load(true);if(!loaded){refreshMessage('Saved snapshot reload failed. Read the page warning for the exact file problem.',true,false);return;}refreshMessage(`Saved snapshot reloaded at ${new Date().toLocaleTimeString()}. ${evidence.length} stat series loaded. ${evidenceLoadError?'Game-log warning: '+evidenceLoadError:'No provider request was made.'}`);});
 $('reload').addEventListener('click',async()=>{
  if(refreshRunning)return;
  refreshRunning=true;refreshMessage('Queuing a server refresh. You can keep browsing…',false,true);
@@ -253,7 +260,8 @@ $('reload').addEventListener('click',async()=>{
  }catch(err){refreshRunning=false;refreshMessage(`Refresh could not start: ${err.message}. Check your server and try again.`,true,false)}
 });
 $('gameSearch').addEventListener('input',renderGames);
-$('marketSearch').addEventListener('input',()=>{subject='';stat='';period='';side='';selectedLine=null;refreshSelectors();renderMarket();});
+let marketSearchTimer;
+$('marketSearch').addEventListener('input',()=>{clearTimeout(marketSearchTimer);marketSearchTimer=setTimeout(()=>{subject='';stat='';period='';side='';selectedLine=null;refreshSelectors();renderMarket();},150);});
 for(const id of ['nba','nfl'])$(id).addEventListener('click',()=>switchLeague(id.toUpperCase()));
 for(const b of document.querySelectorAll('[data-kind]'))b.addEventListener('click',()=>{picksView.close();kindWanted=b.dataset.kind;subject='';stat='';period='';side='';selectedLine=null;$('marketSearch').value='';refreshSelectors();renderMarket();});
 for(const id of ['player','kind','stat','period','side','book'])$(id).addEventListener('change',()=>{
@@ -273,22 +281,10 @@ $('toggleNoteForm').onclick=()=>{const f=$('noteForm');const was=f.classList.con
 async function saveEntry(endpoint,obj,statusId){const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});const result=await r.json();if(!r.ok)throw Error(result.error||`HTTP ${r.status}`);$(statusId).textContent='Saved. Updating source list…';await load();}
 $('outsideForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.target,o=Object.fromEntries(new FormData(form));o.league=league;o.game=game;o.periodID=o.periodID||period||'unknown';o.published_utc=o.published_utc?o.published_utc+'T12:00:00Z':new Date().toISOString();try{await saveEntry('/api/outside-picks',o,'pickSaveState');form.reset();$('outsideForm').classList.add('hidden');}catch(err){$('pickSaveState').textContent=err.message;}});
 $('noteForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.target,o=Object.fromEntries(new FormData(form));o.league=league;o.game=game;o.periodID=period||'unknown';o.date=new Date().toISOString().slice(0,10);o.channel='User-referenced research';try{await saveEntry('/api/research-notes',o,'noteSaveState');form.reset();$('noteForm').classList.add('hidden');}catch(err){$('noteSaveState').textContent=err.message;}});
-void load();setInterval(()=>{if(!document.hidden&&!refreshRunning&&!historyBusy)void load();},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!workspaceBusy)void load();});
+void load();setInterval(()=>{if(!document.hidden&&!refreshRunning&&!workspaceBusy)void load();},60000);
 
-const historySeen=new Set();let historyPending=null,historyBusy=false;
-function schedulePlayerHistory(q){/* Hosted snapshots are owner-managed; do not enqueue desktop jobs. */}
-async function pumpPlayerHistory(){
- if(historyBusy||!historyPending)return;historyBusy=true;const request=historyPending,{player,league:playerLeague}=request;historyPending=null;
- try{
-  const r=await fetch('/api/player-history?player='+encodeURIComponent(player)+'&league='+encodeURIComponent(playerLeague),{method:'POST',headers:{'X-EdgeBoard-Action':'player-history'}});
-  if(r.status===409){historyPending=historyPending||request;setTimeout(()=>{historyBusy=false;void pumpPlayerHistory();},15000);return;}
-  if(!r.ok)throw Error('Player history request HTTP '+r.status);
-  historySeen.add(playerLeague+'|'+player);
-  const poll=async()=>{try{const st=await fetchJson('/api/player-history-status');if(st.running){setTimeout(poll,2000);return;}historyBusy=false;await load();void pumpPlayerHistory();}catch{historyBusy=false;}};
-  setTimeout(poll,1000);return;
- }catch(e){historySeen.add(playerLeague+'|'+player);$('coverageStatus').textContent+=' Automatic player history: '+e.message+'. Run Build-Player-History.ps1 if needed.';}
- historyBusy=false;void pumpPlayerHistory();
-}
+function schedulePlayerHistory(q){/* Player histories are loaded by matchup from the published server snapshot. */}
 
 function showResearchOnly(){
  const selection={league,player:subject,stat,periodID:period||'game',kind:'Player Prop',side:'over',researchOnly:true,asOf:new Date().toISOString()};
@@ -296,13 +292,13 @@ function showResearchOnly(){
  for(const id of ['price','selectedLine','implied','novig','lastFive','lastTen'])$(id).textContent='—';
  $('bookName').textContent=`No ${kindWanted.toLowerCase()} quote returned for this game`;$('currentLine').textContent=title;$('marketLabel').textContent='RESEARCH ONLY · NO SPORTSBOOK PRICE';$('state').textContent='NO QUOTE';$('state').classList.remove('open');
  $('observed').textContent=sample?`${sample.n} games`:'—';$('sampleMeta').textContent=sample?`${sample.current.n} current; ${sample.previous.n} prior appearances`:'History loading or unavailable';
- const message='MY DECISION: PASS — no actual sportsbook quote was returned for this player/statistic. Roster membership and game history do not establish a bettable market.';
+ const message=selectedLine!==null?`PASS — the selected ${side} ${selectedLine} at ${book} is no longer quoted. Choose an available line explicitly; no replacement was selected.`:'MY DECISION: PASS — no actual sportsbook quote was returned for this player/statistic. Roster membership and game history do not establish a bettable market.';
  $('guidance').textContent=message;$('guidance').classList.remove('ok');$('verdict').textContent=message;$('decisionBadge').textContent='PASS';$('decisionBadge').className='pass';$('decisionEvidence').textContent='Exact line and price unavailable';$('decisionChecks').innerHTML='<p>No quoted market: price and Lean checks cannot be evaluated.</p>';$('validationProgress').innerHTML=renderValidationProgress(modelReport,evaluationLoadError);
  $('readbackSelection').textContent=title;$('readbackDate').textContent=dt(selection.asOf);$('evidenceGrade').textContent='—/10';
  $('histMean').textContent=sample?sample.mean.toFixed(1):'—';$('histSd').textContent=sample?.sd!=null?sample.sd.toFixed(1):'—';$('histRange').textContent=sample?`Range ${sample.min}–${sample.max}`:'No sourced outcomes yet';
  $('trend').innerHTML=sample?sample.rows.slice(0,10).map(r=>`<div>${esc(r.value)}<small>${esc(r.date)}</small></div>`).join(''):'<div class="micro">Collecting or awaiting sourced regular-season outcomes.</div>';
  list('reasons',[...(sample?[`Observed ${sample.n} appearances: ${sample.current.n} this season, ${sample.previous.n} prior. Mean ${sample.mean.toFixed(1)}. No hit rate is calculated without an exact threshold.`]:['Current roster identity is selectable even when the odds provider returns no props.']),...factors.why,...observed.why]);
- list('risks',['The saved provider snapshot contains no matching quote. This may reflect bookmaker availability, coverage limits or provider data; the dashboard cannot determine which from absence alone.',...factors.risks,...observed.risks]);
+ list('risks',['The published provider snapshot contains no matching exact quote. This may reflect bookmaker availability, coverage limits or provider data; the dashboard cannot determine which from absence alone.',...factors.risks,...observed.risks]);
  list('observations',['No line, price, probability edge or betting recommendation has been manufactured.']);
  $('coverageStatus').textContent=evidenceCoverage(selection,evidence,evidenceLoadError).message;$('marketCoverageNote').textContent='Roster research: no quoted market. A real provider quote is required before a priced prediction.';
  $('lineLadder').innerHTML='<div class="micro">No quoted alternate lines for this player/statistic.</div>';
@@ -321,4 +317,4 @@ function renderPicksDesk(){
  for(const id of ['research','experts','comparison'])$(id).classList.toggle('hidden',id!=='research');$('notePanel').classList.add('hidden');$('inputPanel').classList.add('hidden');for(const id of ['researchTab','expertTab','booksTab'])$(id).classList.toggle('active',id==='researchTab');
 }
 
-void fetchJson('/api/session').then(access=>{$('reload').disabled=!access.owner;}).catch(()=>{});
+void fetchJson('/api/session').then(access=>{ownerAllowed=access.owner===true;$('reload').disabled=!ownerAllowed;}).catch(()=>{});

@@ -5,11 +5,11 @@
  <header class="topbar">
    <div class="identity"><div class="mark">E<span>↗</span></div><div><div class="brand">EDGEBOARD <span>RESEARCH</span></div><div class="micro">Markets, in context.</div></div></div>
    <nav class="leagueNav" aria-label="League"><button id="nba" class="active">NBA</button><button id="nfl">NFL</button></nav>
-   <div class="topStatus"><div class="statusline"><i id="statusDot"></i><strong id="mode">Awaiting snapshot</strong><span id="updated">—</span></div><button disabled class="btn subtle" id="reload" type="button" title="Owner only: queue a server refresh">↻ <span>Refresh live data</span></button><button class="btn subtle" id="reloadSaved" type="button" title="Reread the existing local snapshots without contacting the provider">Reload saved</button></div>
+   <div class="topStatus"><div class="statusline"><i id="statusDot"></i><strong id="mode">Awaiting snapshot</strong><span id="updated">—</span></div><button disabled class="btn subtle" id="reload" type="button" title="Owner only: queue a server refresh">↻ <span>Refresh live data</span></button><button class="btn subtle" id="reloadSaved" type="button" title="Reload the latest published matchup without contacting the provider">Reload latest</button></div>
  </header>
  <main>
-  <section class="heading"><div><div class="eyebrow">MARKET INTELLIGENCE / <span id="leagueName">NBA</span></div><h1>Game & player lines</h1><p>One line at a time. Real prices, visible assumptions, and a clear risk readback.</p></div><div class="snapshot"><span class="eyebrow">DATA INTEGRITY</span><strong id="dataIntegrity">No verified quotes</strong><small id="freshState">Run your local hourly updater</small></div></section>
-  <div id="warn" class="notice" role="status"></div><div id="refreshFeedback" class="refreshFeedback" role="status" aria-live="polite">Refresh status: idle. Scheduled updates continue independently.</div>
+  <section class="heading"><div><div class="eyebrow">MARKET INTELLIGENCE / <span id="leagueName">NBA</span></div><h1>Game & player lines</h1><p>One line at a time. Real prices, visible assumptions, and a clear risk readback.</p></div><div class="snapshot"><span class="eyebrow">DATA INTEGRITY</span><strong id="dataIntegrity">No verified quotes</strong><small id="freshState">Published server updates</small></div></section>
+  <div class="liveResearchHelp"><strong>Live research</strong><span id="syncStatus" role="status" aria-live="polite">Loading selected matchup…</span><span>Checks every 60 seconds · provider refresh every 10 minutes</span></div><div id="warn" class="notice" role="status"></div><div id="refreshFeedback" class="refreshFeedback" role="status" aria-live="polite">Scheduled server updates continue independently.</div>
   <section class="summary" aria-label="Market summary"><div><span>GAMES ON BOARD</span><strong id="gamesTotal">0</strong></div><div><span>DK QUOTES</span><strong id="marketsTotal">0</strong></div><div><span>OFFERED ALT LINES</span><strong id="altsTotal">0</strong></div><div><span>INDEPENDENT EDGE STATUS</span><strong class="statusText">Not calibrated</strong></div></section>
   <div class="workspace">
    <aside class="sidebar card">
@@ -60,7 +60,7 @@
    </aside>
   </div>
   <section class="card historicalEvaluation" aria-label="Historical model evaluation"><details><summary><strong>Historical model evaluation</strong> · statistics-only research</summary><p>Compare the current model with baselines using only earlier games. This evaluates saved NBA full-game histories and leaves live recommendations unchanged.</p><button disabled title="Owner pipeline action; unavailable in the hosted read-only console" id="runHistorical" type="button" class="btn subtle">Run historical evaluation</button><p id="historicalStatus" class="micro" role="status" aria-live="polite">Ready. Let history refresh finish before running.</p><div id="historicalResults"></div></details></section>
-  <footer>EDGEBOARD RESEARCH CONSOLE <span>Cloud snapshot of the owner’s research pipeline. Check timestamps. Windows-only jobs run separately; no unverified +EV badges.</span></footer>
+  <footer>EDGEBOARD RESEARCH CONSOLE <span>Live published research. Player history loads by matchup; quote timestamps and model limitations stay visible.</span></footer>
  </main>
 </div>
 <script type="module" src="./app.mjs"></script>
