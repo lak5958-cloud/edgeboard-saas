@@ -23,3 +23,13 @@ These are exploratory checks on selected, correlated lines. Even a lower error o
 ## Verification for this update
 
 Regression cases cover periods, duplicate IDs, conflicting quote fields, conditional calibration, invalid probability mass, aliases and earliest-snapshot selection, source conflicts, paired price comparisons, complete intrahour coverage, bounded read concurrency and escaped output. The Research browser flow is checked with synthetic fixtures, never presented as real sports performance. Production account-based settlement verification requires authorized sign-in; report it as incomplete if blocked.
+
+## Market benchmark and broader sample
+
+New captures save the two prices for an exact player prop when both were offered by the same sportsbook in the same provider response. The pair must match the player, event, statistic, period and threshold. The audit divides the selected side's implied probability by the sum of both sides' implied probabilities. Comparisons use matched scored outcomes and show coverage. Earlier archives can still use the original price as the break-even benchmark.
+
+The broader sample is separate from the shortlist. It selects up to twelve standard and twelve alternate forecasts per game and sportsbook, using stable market keys before the positive-return and shortlist filters. The audit selects the first retained capture in the 60-to-45-minute pregame window. A missed refresh window yields missing coverage. Captures include available dated injury and exact-event factors for later experiments. Game markets remain in their own archive.
+
+## Local replay
+
+Run `node scripts/replay-workload.mjs path/to/evidence.json` with one or more saved evidence files. This compares fixed prior-strength and workload alternatives with chronological box-score history using thresholds generated from earlier appearances. A threshold replay measures probability error on synthetic lines. A historical odds replay additionally requires timestamped sportsbook quotes, outcomes and point-in-time context. Keep those reconstructed runs separate from prospective frozen forecasts.

@@ -67,7 +67,8 @@ export default async function handler(req,res){try{
    const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');
    const raw=gunzipSync(bytes,{maxOutputLength:20000000});expandedBytes+=raw.length;if(expandedBytes>40000000)throw new AppError(503,'Retained snapshots exceed the review memory limit. No partial score is shown.');return JSON.parse(raw.toString());
   });
-  const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day}),coverage:`All ${selected.length} indexed or legacy retained snapshots for this date were read, with duplicate paths removed. No hourly sampling. The archive covers published shortlists and watchlists, not every offered market. Results remain exploratory, not a calibration certificate or verified historical ROI.`});
+  const scope=url.searchParams.get('scope')==='cohort'?'cohort':'shortlist';
+  const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day,scope}),coverage:`All ${selected.length} indexed or legacy retained snapshots for this date were read, with duplicate paths removed. No hourly sampling. ${scope==='cohort'?'Evaluation cohort includes supported standard and alternate props captured before shortlist filtering.':'This view covers published shortlists and watchlists.'} Results remain exploratory, not a calibration certificate or verified historical ROI.`});
  }
  if(route==='research-workspace'){
   requirePro(access);const part=url.searchParams.get('part')||'meta';if(!['meta','quotes','records'].includes(part)||!['NBA','NFL'].includes(url.searchParams.get('league')||'NBA'))throw new AppError(400,'Choose a supported research scope.');let version=await snapshotRevision({fresh:part==='meta'});const expected=url.searchParams.get('version');if(expected&&expected!==version)version=await snapshotRevision({fresh:true});

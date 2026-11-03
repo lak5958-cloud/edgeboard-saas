@@ -61,3 +61,16 @@ test('audit UI explains counts, sources and gaps in readable language and escape
  const r=audit({...pick,player:'<script>alert(1)</script>'}),html=frozenAuditView({...r,coverage:'All test snapshots'});
  assert.match(html,/Archive exclusions/);assert.match(html,/Verified result source/);assert.match(html,/original sportsbook price/);assert.match(html,/not a no-vig/);assert(!html.includes('<script>'));assert.match(html,/Model versions/);
 });
+
+test('broader sample uses one capture per game and book inside the pregame window',()=>{
+ const entry={...pick,book:'draftkings',athleteID:'7',label:'EVALUATION',asOf:'2026-11-02T22:59Z'};
+ const capture=(rows,savedAt,path)=>({report:{evaluationCohort:rows},savedAt,path});
+ const early=capture([entry],'2026-11-02T23:01Z','first');
+ const late=capture([{...entry,line:25.5,quote:{...entry.quote,line:25.5}}],'2026-11-02T23:10Z','second');
+ const outside=capture([entry],'2026-11-02T23:20Z','outside');
+ const rows=auditFrozen([outside,late,early],[record()],{day:'2026-11-02',now,scope:'cohort'}).results;
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].line,20.5);
+ assert.equal(rows[0].archivePath,'first');
+ assert.equal(auditFrozen([early],[record()],{day:'2026-11-02',now}).results.length,0);
+});
