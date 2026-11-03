@@ -3,7 +3,7 @@ const finite=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x));
 const gameKey=s=>String(s||'').trim().split(/\s*@\s*|\s+vs\.?\s+/i).map(s=>teamCode(s.trim())).join('@');
 export function findBoardMarket(pick,{quotes=[],games=[],preferredBook='draftkings',now=new Date()}={}){
  const league=String(pick.league||'').toUpperCase(),targetPeriod=String(pick.periodID||'unknown').toLowerCase(),knownPeriod=targetPeriod!=='unknown'&&targetPeriod!=='';
- const targetGames=games.filter(g=>(!league||g.league===league)&&(!pick.game||gameKey(g.game)===gameKey(pick.game))&&(!pick.eventID||g.eventID===pick.eventID));
+ const targetGames=games.filter(g=>(!pick.slateDate||new Date(g.start).toLocaleDateString('en-CA',{timeZone:'America/New_York'})===pick.slateDate)&&(!league||g.league===league)&&(!pick.game||gameKey(g.game)===gameKey(pick.game))&&(!pick.eventID||g.eventID===pick.eventID));
  const loaded=q=>games.find(g=>g.league===q.league&&(g.eventID&&q.eventID?g.eventID===q.eventID:g.game===q.game));
  const matches=latestQuotes(quotes.filter(q=>(!league||q.league===league)&&loaded(q)&&sameName(q.player,pick.subject)&&sameStat(q.stat,pick.market)&&String(q.side||'').toLowerCase()===String(pick.side||'').toLowerCase()));
  const inGame=q=>targetGames.some(g=>g.league===q.league&&(g.eventID&&q.eventID?g.eventID===q.eventID:g.game===q.game));
