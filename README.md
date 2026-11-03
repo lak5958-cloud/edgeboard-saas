@@ -43,3 +43,7 @@ Read docs/HANDOFF.md for Claude/GitHub/Vercel continuation and docs/CLASS-PLAN.m
 ## Version 2.1 automatic data and fantasy update
 
 See [Automatic data](docs/AUTOMATIC-DATA.md) for hosted refresh scheduling, the owner-only controls, exact fantasy scoring, schedule context and honest pick screening. No provider keys are stored in this repository. Current-season history backfills in batches without blocking visitors.
+
+## 2.2 update
+
+See `docs/MODEL-2.2.md` for the shared NFL research policy, experimental matchup model and verification limits. See `docs/STRIPE-INTEGRATION-PLAN.md` for the accepted Stripe planner decisions, sandbox resources, required server credential and final live-payment steps. New installations must also apply `supabase/billing.sql` for the private webhook audit/review queue.

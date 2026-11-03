@@ -1,3 +1,4 @@
+import {matchupForecast} from './matchup-model.mjs';
 import {analyzeTeamSelection,teamSample} from './team-research.mjs';
 import {belongsToGame,quoteProfile,identityRecords} from './rosters.mjs';
 import {observedContext} from './matchups.mjs';
@@ -83,7 +84,7 @@ export function thresholdDirection(q,baseline){
  const diff=Number(q.line)-Number(baseline.line),side=String(q.side||'').toLowerCase();const harder=side==='over'?diff>0:side==='under'?diff<0:null;
  return harder===null?'Different quoted threshold':harder?'More demanding threshold':'More forgiving threshold';
 }
-export function lineLadder(q,quotes,records=[],teamContext=null){return quotes.map(alt=>{const s=teamContext?teamSample(alt,teamContext.game,teamContext.games):sampleSummary(alt,records);return {line:alt.line,odds:alt.odds,breakEven:implied(alt.odds),available:alt.available,asOf:alt.asOf,alt:alt.alt,hits:s?.hits??null,n:s?.n??null};});}
+export function lineLadder(q,quotes,records=[],teamContext=null){return quotes.map(alt=>{const s=teamContext?teamSample(alt,teamContext.game,teamContext.games):sampleSummary(alt,records);const m=teamContext&&s?matchupForecast(alt,teamContext.game,teamContext.matchupGames||teamContext.games,s.selection):forecast(alt,s,{game:teamContext?.game,evaluate:false});return {line:alt.line,odds:alt.odds,breakEven:implied(alt.odds),available:alt.available,asOf:alt.asOf,alt:alt.alt,hits:s?.hits??null,n:s?.n??null,probability:m.status==='experimental'?m.pWin:null,push:m.status==='experimental'?m.pPush:null};});}
 export function matchingOutside(q,experts=[]){return experts.filter(e=>e.league===q.league&&sameName(e.subject,q.player)&&sameStat(e.market,q.stat)&&String(e.periodID||'unknown')===quotePeriod(q)).map(e=>{
  const match=String(e.side||'').toLowerCase()===String(q.side||'').toLowerCase(); const exact=match&&numeric(e.line)&&numeric(q.line)&&Number(e.line)===Number(q.line);
  return {...e,alignment:exact?'EXACT MATCH':match?'SAME DIRECTION · DIFFERENT LINE':'OPPOSING / DIFFERENT SIDE',exact,match};

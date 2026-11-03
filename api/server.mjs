@@ -1,10 +1,11 @@
+import {publicGameMarkets} from '../lib/game-markets.mjs';
 import {tradeEvidence,groundedBrief,briefPrompt} from '../lib/ai-evidence.mjs';
 import {availablePickMarkets} from '../lib/pick-markets.mjs';
 import {workspaceScope,workspaceMeta,workspacePage} from '../lib/research-workspace.mjs';
 import {withCurrentProfiles} from '../lib/profiles.mjs';
 import {runRefresh} from '../lib/refresh.mjs';import {publicDailyPicks} from '../lib/daily-picks.mjs';
 import {gzipSync} from 'node:zlib';import {pageRows} from '../lib/snapshot-pages.mjs';
-import {createHash,timingSafeEqual} from 'node:crypto';import {AppError,required,sb,snapshot,snapshotRevision,bundle,request} from '../lib/cloud.mjs';import {accessFor,requirePro,login,sessionCookies,userFor} from '../lib/auth.mjs';import {checkout,stripe,verifyWebhook,syncSubscription} from '../lib/billing.mjs';import {playerList,analyzeTrade} from '../lib/fantasy.mjs';import {scanGamePicks} from '../lib/picks.mjs';
+import {createHash,timingSafeEqual} from 'node:crypto';import {AppError,required,sb,snapshot,snapshotRevision,bundle,request} from '../lib/cloud.mjs';import {accessFor,requirePro,login,sessionCookies,userFor} from '../lib/auth.mjs';import {billingReadiness,checkout,stripe,verifyWebhook,handleStripeEvent} from '../lib/billing.mjs';import {playerList,analyzeTrade} from '../lib/fantasy.mjs';import {scanGamePicks} from '../lib/picks.mjs';
 export const config={api:{bodyParser:false}};
 const json=(res,status,data)=>{res.statusCode=status;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','private, no-store');const body=JSON.stringify(data);if(Buffer.byteLength(body)>32768){res.setHeader('Content-Encoding','gzip');res.setHeader('Vary','Accept-Encoding');res.end(gzipSync(body));}else res.end(body);};
 async function rawBody(req){const parts=[];let size=0;for await(const part of req){size+=part.length;if(size>65536)throw new AppError(413,'Request is too large.');parts.push(part);}return Buffer.concat(parts);}
@@ -18,14 +19,12 @@ export default async function handler(req,res){try{
  }
  if(route==='billing/webhook'){
   if(req.method!=='POST')throw new AppError(405,'POST required.');const event=verifyWebhook(await rawBody(req),req.headers['stripe-signature'],required('STRIPE_WEBHOOK_SECRET'));
-  let id;if(event.type.startsWith('customer.subscription.'))id=event.data.object.id;
-  if(event.type==='checkout.session.completed')id=event.data.object.subscription;
-  if(event.type.startsWith('invoice.'))id=event.data.object.subscription||event.data.object.parent?.subscription_details?.subscription;
-  if(id)await syncSubscription(id);return json(res,200,{received:true});
+  await handleStripeEvent(event);return json(res,200,{received:true});
  }
  if(req.method!=='GET'&&req.method!=='POST')throw new AppError(405,'Method not allowed.');
  if(req.method==='POST')origin(req);
- if(route==='health')return json(res,200,{version:'1.12.1',saasVersion:'2.1.0',refreshSupported:true,connected:!!process.env.SUPABASE_URL});
+ if(route==='billing/config')return json(res,200,billingReadiness());
+ if(route==='health')return json(res,200,{version:'1.12.1',saasVersion:'2.2.0',refreshSupported:true,connected:!!process.env.SUPABASE_URL});
  if(route==='session')return json(res,200,await accessFor(req,res));
  if(['auth/login','auth/signup'].includes(route)){if(req.method!=='POST')throw new AppError(405,'POST required.');await budget(req,'auth',20);const b=JSON.parse((await rawBody(req)).toString());return json(res,200,await login(res,b.email,b.password,route.endsWith('signup')));}
  if(route==='auth/logout'){if(req.method!=='POST')throw new AppError(405,'POST required.');const user=await userFor(req,res);sessionCookies(res,null);return json(res,200,{signedOut:true});}
@@ -40,11 +39,13 @@ export default async function handler(req,res){try{
   const selected=JSON.parse(result.choices?.[0]?.message?.content||'{}'),brief=groundedBrief(evidence,selected);return json(res,200,{brief,provider:'OpenAI',model:process.env.AI_MODEL,recommendation:trade.recommendation,method:'AI prioritizes existing evidence; the server renders verified facts. No AI probabilities or revised recommendations.',sources:[...new Set([...trade.give,...trade.receive].flatMap(p=>p.sources))]});
  }
  if(route==='data-status'){const status=await snapshot('refresh-status.json',{});return json(res,200,{...status,oddsConfigured:!!process.env.SPORTSGAMEODDS_API_KEY,scheduledIntervalMinutes:10});}
+ if(route==='game-markets'){const [report,live]=await Promise.all([snapshot('daily-game-markets.json',{}),snapshot('live-data.json',{})]);return json(res,200,publicGameMarkets(report,live,Object.fromEntries(url.searchParams)));}
  if(route==='pick-markets'){const [live,profiles]=await Promise.all([snapshot('live-data.json',{}),snapshot('roster-cache.json',[])]);return json(res,200,availablePickMarkets(live,profiles,Object.fromEntries(url.searchParams)));}
  if(route==='picks'){const league=url.searchParams.get('league')||'NBA';if(!['NBA','NFL'].includes(league))throw new AppError(400,'Choose NBA or NFL.');const report=await snapshot('daily-picks.json',{});return json(res,200,publicDailyPicks(report,league,new Date(),url.searchParams.get('book')||'draftkings'));}
  const access=await accessFor(req,res);
+ if(route==='billing/review'){if(!access.owner)throw new AppError(403,'Owner access required.');if(req.method==='POST'){const b=JSON.parse((await rawBody(req)).toString());if(!/^evt_[A-Za-z0-9]+$/.test(b.id||''))throw new AppError(400,'Invalid billing event.');await sb('/rest/v1/billing_events?id=eq.'+encodeURIComponent(b.id),{method:'PATCH',body:JSON.stringify({review_required:false,result:'Owner marked reviewed. No automatic monetary action.'})});return json(res,200,{reviewed:true});}return json(res,200,{events:await sb('/rest/v1/billing_events?review_required=eq.true&order=created_at.desc&limit=20')});}
  if(route==='billing/checkout'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in before checkout.');await budget(req,'checkout',10);const s=await checkout(access.user);return json(res,200,{url:s.url});}
- if(route==='billing/portal'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in first.');const rows=await sb('/rest/v1/entitlements?user_id=eq.'+encodeURIComponent(access.user.id)+'&kind=eq.subscription&select=customer_id');if(!rows[0]?.customer_id)throw new AppError(400,'No billing account found.');const p=await stripe('billing_portal/sessions',{customer:rows[0].customer_id,return_url:required('APP_URL')+'/account'});return json(res,200,{url:p.url});}
+ if(route==='billing/portal'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in first.');const rows=await sb('/rest/v1/entitlements?user_id=eq.'+encodeURIComponent(access.user.id)+'&kind=eq.subscription&select=customer_id');if(!rows[0]?.customer_id)throw new AppError(400,'No billing account found.');const p=await stripe('billing_portal/sessions',{customer:rows[0].customer_id,return_url:required('APP_URL')+'/account',...(process.env.STRIPE_PORTAL_CONFIGURATION_ID?{configuration:process.env.STRIPE_PORTAL_CONFIGURATION_ID}:{})});return json(res,200,{url:p.url});}
  if(route==='research-workspace'){
   requirePro(access);const part=url.searchParams.get('part')||'meta';if(!['meta','quotes','records'].includes(part)||!['NBA','NFL'].includes(url.searchParams.get('league')||'NBA'))throw new AppError(400,'Choose a supported research scope.');let version=await snapshotRevision({fresh:part==='meta'});const expected=url.searchParams.get('version');if(expected&&expected!==version)version=await snapshotRevision({fresh:true});
   if(expected&&expected!==version)throw new AppError(409,'Published data changed during this read. Reloading the latest complete snapshot.');

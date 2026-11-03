@@ -1,3 +1,4 @@
+import {researchPolicy} from './research-policy.mjs';
 import {fitFootball,footballBacktest} from './football-model.mjs';
 import {fitSeason,seasonBacktest} from './season-model.mjs';
 // Experimental distribution forecast. No quote-supplied validation flags are trusted.
@@ -75,9 +76,9 @@ export function exactDecision({state,quote,model,breakEven,availability=null}){
  const current=model?.season?.currentN;
  if(model?.season)add('current',quote?.league==='NFL'?'Current-team NFL sample':'Current-team NBA sample',finite(current)?(current>=5?'pass':'fail'):'unknown',finite(current)?`${current}/5 required current-season games for the current team.`:'Current-team game count unavailable.','Wait for additional completed current-team games, or refresh missing verified logs.');
  else add('current','Current-team NBA sample',quote?.league==='NBA'&&quote?.kind==='Player Prop'?'unknown':'not-applicable',quote?.league==='NBA'&&quote?.kind==='Player Prop'?'Unavailable until an eligible NBA season/team forecast can be built.':'NBA-specific gate; other leagues retain their forecast eligibility rules.');
- if(model?.availableForLean===false)add('matchup','Game-market matchup validation','fail','This is an unadjusted team-history baseline, not an independently calibrated matchup forecast.','Review the sourced team evidence; game-market Lean remains blocked until a matchup model is validated.');
- const replay=model?.backtest?.n;
- add('replay','Chronological test count',experimental&&finite(replay)?(replay>=20?'pass':'fail'):'unknown',experimental&&finite(replay)?`${replay}/20 required chronological test predictions. Current-threshold replay is not archived-price validation.`:'Chronological test count unavailable.','Collect enough verified earlier games for 20 chronological tests.');
+ if(model?.availableForLean===false)add('matchup','Game-market matchup validation','fail','The fitted team matchup forecast has not been independently calibrated or validated at historical sportsbook prices.','Review the sourced team evidence; game-market Lean remains blocked until a matchup model is validated.');
+ const replay=model?.backtest?.n,policy=researchPolicy(quote?.league);
+ add('replay','Chronological test count',experimental&&finite(replay)?(replay>=policy.replay?'pass':'fail'):'unknown',experimental&&finite(replay)?`${replay}/${policy.replay} required chronological test predictions (${policy.version}). Current-threshold replay is not archived-price validation.`:'Chronological test count unavailable.',`Collect enough verified earlier games for ${policy.replay} chronological tests. This is an experimental screening minimum, not proof of calibration.`);
  let conditional=null,ev=null;
  if(experimental&&[model.pWin,model.pLoss].every(finite)){
   const settled=model.pWin+model.pLoss;conditional=settled>0?model.pWin/settled:null;
@@ -92,5 +93,5 @@ export function exactDecision({state,quote,model,breakEven,availability=null}){
  const ordered=ev!==null&&ev<=0?[...blockers.filter(c=>c.id==='return'),...blockers.filter(c=>c.id!=='return')]:blockers;
  const reason=lean?'All experimental Lean gates met. A historical-bound research lean; independent prospective validation remains unavailable.':ordered.map(c=>`${c.label}: ${c.detail}`).join(' ');
  const label=lean?'LEAN':'PASS';
- return {label,take:false,checks,blockers,conditionalWin:conditional,expectedNet:ev,takePolicy:'Automatic Take is disabled in this version. Frozen pregame predictions and later outcomes require independent review before enabling it; no automatic unlock count is defined.',reason,summary:`MY DECISION: ${label} ${quote?.side||''} ${quote?.kind==='Moneyline'?'moneyline':quote?.line??''} at ${price}. ${reason}`};
+ return {label,take:false,policy,checks,blockers,conditionalWin:conditional,expectedNet:ev,takePolicy:'Automatic Take is disabled in this version. Frozen pregame predictions and later outcomes require independent review before enabling it; no automatic unlock count is defined.',reason,summary:`MY DECISION: ${label} ${quote?.side||''} ${quote?.kind==='Moneyline'?'moneyline':quote?.line??''} at ${price}. ${reason}`};
 }
