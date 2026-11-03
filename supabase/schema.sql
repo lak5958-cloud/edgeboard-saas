@@ -1,12 +1,12 @@
 -- Run once in Supabase SQL editor. No client can grant itself an entitlement.
 create table if not exists public.entitlements (
  user_id uuid references auth.users(id) on delete cascade,
- kind text check(kind in ('subscription','grader','owner')) not null,
+ kind text check(kind in ('subscription','grader','owner','complimentary')) not null,
  expires_at timestamptz, customer_id text, subscription_id text,
  primary key(user_id,kind)
 );
 alter table public.entitlements drop constraint if exists entitlements_kind_check;
-alter table public.entitlements add constraint entitlements_kind_check check(kind in ('subscription','grader','owner'));
+alter table public.entitlements add constraint entitlements_kind_check check(kind in ('subscription','grader','owner','complimentary'));
 create unique index if not exists one_site_owner on public.entitlements(kind) where kind='owner';
 alter table public.entitlements enable row level security;
 revoke all on public.entitlements from public,anon,authenticated;

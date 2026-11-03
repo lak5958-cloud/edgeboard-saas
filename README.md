@@ -47,3 +47,10 @@ See [Automatic data](docs/AUTOMATIC-DATA.md) for hosted refresh scheduling, the 
 ## 2.2 update
 
 See `docs/MODEL-2.2.md` for the shared NFL research policy, experimental matchup model and verification limits. See `docs/STRIPE-INTEGRATION-PLAN.md` for the accepted Stripe planner decisions, sandbox resources, required server credential and final live-payment steps. New installations must also apply `supabase/billing.sql` for the private webhook audit/review queue.
+
+
+### Complimentary Pro access
+
+Signed-in users can redeem an owner-provided code on **Account → Have an access code?** The server validates the code and records a permanent `complimentary` entitlement for the verified account. Redemption is rate limited, repeatable without duplicate rows, and grants no owner privileges. The accepted value is not shipped to the browser. Existing subscriptions are not canceled by redemption; existing billing management remains available. Users with active Pro access cannot create a new checkout subscription.
+
+For a new database, run the current `supabase/schema.sql`; existing installs need `supabase/access-codes.sql`. Owner and grader grants remain separate and unchanged.
