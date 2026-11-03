@@ -1,3 +1,4 @@
+import {workloadAudit} from '../lib/workload-audit.mjs';
 import {auditDates} from '../lib/audit-summary.mjs';
 import outsideSeed from '../lib/outside-seed.json' with {type:'json'};
 import {auditFrozen} from '../lib/frozen-audit.mjs';
@@ -54,6 +55,7 @@ export default async function handler(req,res){try{
  if(route==='billing/review'){if(!access.owner)throw new AppError(403,'Owner access required.');if(req.method==='POST'){const b=JSON.parse((await rawBody(req)).toString());if(!/^evt_[A-Za-z0-9]+$/.test(b.id||''))throw new AppError(400,'Invalid billing event.');await sb('/rest/v1/billing_events?id=eq.'+encodeURIComponent(b.id),{method:'PATCH',body:JSON.stringify({review_required:false,result:'Owner marked reviewed. No automatic monetary action.'})});return json(res,200,{reviewed:true});}return json(res,200,{events:await sb('/rest/v1/billing_events?review_required=eq.true&order=created_at.desc&limit=20')});}
  if(route==='billing/checkout'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in before checkout.');if(access.pro)throw new AppError(409,'You already have Pro access. No new subscription is needed.');await budget(req,'checkout',10);const s=await checkout(access.user);return json(res,200,{url:s.url});}
  if(route==='billing/portal'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in first.');const rows=await sb('/rest/v1/entitlements?user_id=eq.'+encodeURIComponent(access.user.id)+'&kind=eq.subscription&select=customer_id');if(!rows[0]?.customer_id)throw new AppError(400,'No billing account found.');const p=await stripe('billing_portal/sessions',{customer:rows[0].customer_id,return_url:required('APP_URL')+'/account',...(process.env.STRIPE_PORTAL_CONFIGURATION_ID?{configuration:process.env.STRIPE_PORTAL_CONFIGURATION_ID}:{})});return json(res,200,{url:p.url});}
+ if(route==='workload-audit'){requirePro(access);const data=await bundle({includeHistory:true});return json(res,200,workloadAudit(data.records,data.rosters));}
  if(route==='frozen-audit-dates'){requirePro(access);return json(res,200,{dates:auditDates(await snapshot('frozen-index.json',[]))});}
  if(route==='frozen-audit'){
   requirePro(access);if(req.method!=='GET')throw new AppError(405,'GET required.');

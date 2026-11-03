@@ -1,0 +1,11 @@
+# Shadow challenger, declared November 3, 2026
+
+Version: `shrink-even-strength20-v1`. This is a monitoring hypothesis, never an active pick or an independently calibrated forecast.
+
+For an available active forecast, preserve push probability. Let n be its effective sample size, or its training count when no effective count exists. The challenger assigns weight n / (n + 20) to the active non-push conditional probability and the remaining weight to 0.5. Convert the conditional result back into win/push/loss masses. The fixed strength 20 was not selected by optimizing November 2 results. The 50% reference is a simple confidence-shrinkage hypothesis, not a sportsbook forecast. It can increase long-shot probabilities; it must not be described as necessarily safer to bet.
+
+Store each challenger alongside its exact active selection during Daily Picks generation, with its creation time, version, source active win/push probabilities, effective sample, weight, and selection identity. Existing odds, active probabilities, evidence gates, labels, rankings and access remain unchanged.
+
+Score only a challenger that exists in the immutable pregame object, matches the event/player/statistic/side/line/book, and was created before the game and before storage. Do not fill missing historical challenger predictions. The paired comparison uses identical settled outcomes and non-push conditional probabilities; pending and push outcomes cannot become losses. Integer-line active archives without a saved push estimate cannot be assigned a binary Brier. Report active versus shadow Brier on the same paired selections and the mean difference per scored date. Separate NBA/NFL, sportsbook and original decision labels. Correlated alternative lines and books remain a limitation. No automatic promotion threshold is defined; multiple later dates and independent review are required before changing the live model.
+
+The NFL workload-health endpoint checks current-season/current-team sourced box scores independently of offered games. It samples QB/RB/WR/TE examples by available coverage and reports measured counters and source dates. This verifies ingestion coverage, not predictive accuracy. Missing statistics, snaps, routes and future workload are not invented.
