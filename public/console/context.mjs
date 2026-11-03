@@ -15,7 +15,7 @@ export function contextReadback(q,context={},now=new Date(),game=null){
  const injury=current.sort((a,b)=>(Date.parse(b.fetchedAt)||0)-(Date.parse(a.fetchedAt)||0))[0];
  if(injury){const age=(now-Date.parse(injury.fetchedAt))/3600000;const fresh=Number.isFinite(age)&&age>=0&&age<=2;
  why.push(`Injury listing: ${injury.status}; fetched ${injury.fetchedAt}; reported ${injury.reportedAt||'date unavailable'}. ${injury.detail||''}`);
- const reportAge=(now-Date.parse(injury.reportedAt))/3600000;availability={status:injury.status,reportedAt:injury.reportedAt,fetchedAt:injury.fetchedAt,fresh,reportAgeHours:Number.isFinite(reportAge)?reportAge:null,blocked:/^(out|doubtful|suspended|injured reserve|ir|inactive|pup)(?:$|[ /-])/i.test(injury.status)};
+ const reportAge=(now-Date.parse(injury.reportedAt))/3600000;availability={url:injury.url,source:injury.source,status:injury.status,reportedAt:injury.reportedAt,fetchedAt:injury.fetchedAt,fresh,reportAgeHours:Number.isFinite(reportAge)?reportAge:null,blocked:/^(out|doubtful|suspended|injured reserve|ir|inactive|pup)(?:$|[ /-])/i.test(injury.status)};
  sources.push({label:injury.source,url:injury.url});risks.push(fresh?'Injury listing is not official confirmation of availability or minutes.':'Injury listing is stale or undated; refresh and confirm official status.');
  if(availability.blocked&&!fresh)risks.push('The last matched listing says unavailable. It remains a blocker even though stale; obtain newer clearance rather than assuming recovery.');
  }else risks.push('No matched injury report. Absence from an injury listing does not verify health or availability.');
