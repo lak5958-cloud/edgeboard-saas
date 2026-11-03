@@ -2,6 +2,7 @@ import {workloadAudit} from '../lib/workload-audit.mjs';
 import {auditDates} from '../lib/audit-summary.mjs';
 import outsideSeed from '../lib/outside-seed.json' with {type:'json'};
 import {auditFrozen} from '../lib/frozen-audit.mjs';
+import {selectFrozenSources,readFrozenSources} from '../lib/frozen-review.mjs';
 import {frozenSources} from '../lib/frozen-sources.mjs';
 import {gunzipSync} from 'node:zlib';
 import {supaHeaders} from '../lib/cloud.mjs';
@@ -59,8 +60,14 @@ export default async function handler(req,res){try{
  if(route==='frozen-audit-dates'){requirePro(access);return json(res,200,{dates:auditDates(await snapshot('frozen-index.json',[]))});}
  if(route==='frozen-audit'){
   requirePro(access);if(req.method!=='GET')throw new AppError(405,'GET required.');
-  const day=url.searchParams.get('day')||'2026-11-02';if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day)))throw new AppError(400,'Choose a valid audit date.');const index=await snapshot('frozen-index.json',[]),all=[...(day==='2026-11-02'?frozenSources:[]),...index.filter(e=>e.kind==='players'&&e.slateDate===day)];const hourly=new Map();for(const e of all.sort((a,b)=>Date.parse(a.savedAt)-Date.parse(b.savedAt))){const key=e.savedAt.slice(0,13);if(!hourly.has(key))hourly.set(key,e);}const selected=day==='2026-11-02'&&all.length===frozenSources.length?frozenSources:[...hourly.values()].slice(0,24);const reports=await Promise.all(selected.map(async source=>{const r=await fetch(required('SUPABASE_URL')+'/storage/v1/object/authenticated/edgeboard/'+source.path,{headers:supaHeaders(true),signal:AbortSignal.timeout(15000)});if(!r.ok)throw new AppError(503,'A retained pregame snapshot could not be read. No results were inferred.');const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');return {...source,report:JSON.parse(gunzipSync(bytes,{maxOutputLength:20000000}).toString())};}));
-  const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day}),coverage:`${selected.length} retained snapshots sampled (earliest per UTC hour for indexed dates). This is an exploratory shortlist audit, not a complete slate, independent calibration certificate or historical ROI.`});
+  const day=url.searchParams.get('day')||'2026-11-02';if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day))||new Date(day).toISOString().slice(0,10)!==day)throw new AppError(400,'Choose a valid audit date.');const index=await snapshot('frozen-index.json',[]);let selected;try{selected=selectFrozenSources(index,day==='2026-11-02'?frozenSources:[],day);}catch(e){throw new AppError(503,e.message);}
+  let expandedBytes=0;const reports=await readFrozenSources(selected,async source=>{
+   const r=await fetch(required('SUPABASE_URL')+'/storage/v1/object/authenticated/edgeboard/'+source.path,{headers:supaHeaders(true),signal:AbortSignal.timeout(15000)});
+   if(!r.ok)throw new AppError(503,'A retained pregame snapshot could not be read. No results were inferred.');
+   const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');
+   const raw=gunzipSync(bytes,{maxOutputLength:20000000});expandedBytes+=raw.length;if(expandedBytes>40000000)throw new AppError(503,'Retained snapshots exceed the review memory limit. No partial score is shown.');return JSON.parse(raw.toString());
+  });
+  const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day}),coverage:`All ${selected.length} indexed or legacy retained snapshots for this date were read, with duplicate paths removed. No hourly sampling. The archive covers published shortlists and watchlists, not every offered market. Results remain exploratory, not a calibration certificate or verified historical ROI.`});
  }
  if(route==='research-workspace'){
   requirePro(access);const part=url.searchParams.get('part')||'meta';if(!['meta','quotes','records'].includes(part)||!['NBA','NFL'].includes(url.searchParams.get('league')||'NBA'))throw new AppError(400,'Choose a supported research scope.');let version=await snapshotRevision({fresh:part==='meta'});const expected=url.searchParams.get('version');if(expected&&expected!==version)version=await snapshotRevision({fresh:true});
