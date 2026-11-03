@@ -33,3 +33,15 @@ The broader sample is separate from the shortlist. It selects up to twelve stand
 ## Local replay
 
 Run `node scripts/replay-workload.mjs path/to/evidence.json` with one or more saved evidence files. This compares fixed prior-strength and workload alternatives with chronological box-score history using thresholds generated from earlier appearances. A threshold replay measures probability error on synthetic lines. A historical odds replay additionally requires timestamped sportsbook quotes, outcomes and point-in-time context. Keep those reconstructed runs separate from prospective frozen forecasts.
+
+## Game lines and historical odds pilot
+
+Select **Game markets** in the Frozen Pregame Audit to grade the independently archived moneylines, spreads, game totals and team totals. It requires matching, reciprocal final scores for both teams, the UTC game date and the quoted home/away orientation. Conflicting fixtures and missing score pairs stay pending. This view does not combine game-line and prop metrics.
+
+Run `node scripts/replay-saved-odds.mjs board.json evidence.json roster.json team-history.json` on a saved board to reconstruct forecasts for its standard full-game lines. The board observation establishes the cutoff. Player identification requires a roster record dated by that cutoff and tied to the matchup. Training uses earlier game dates. The script prints separate coverage and scores for props and game markets. It does not publish these reconstructed forecasts to the frozen ledger.
+
+The local November 2 pilot found a dated odds board and produced 1,326 prop forecasts and 300 game-market forecasts. Local outcome files lacked matched final results, so this run did not produce an accuracy score. Earlier dated roster profiles recovered some player joins. The pilot predates part of the archived forecast coverage on November 2, but it is not evidence of a separate earlier slate.
+
+The box-score replay reports results separately for recorded debut-year players, players with another observed team, established players and cases without a known debut year. First observed team transitions are tracked as excluded coverage. No recorded debut-year cohort qualified in the local replay. Run the same script with `--team-history team-history.json` to test the NBA opponent points-allowed adjustment on matched forecasts. The local central-line Brier scores were 0.24103 active and 0.24062 adjusted on 7,642 correlated thresholds. Pace and injury tests still require adequate dated coverage.
+
+The pilot accepts an optional fifth input with verified audit outcome rows. They are joined by saved event and athlete identity and used only to grade outcomes. With the November 2 verified outcome rows, 43 reconstructed props were scored. Active Brier was 0.37503 and quoted-price Brier was 0.25487 on the same rows. These rows share players and games and inherit the original shortlist coverage. The other 1,283 prop forecasts and 300 game forecasts remained pending in that run.
