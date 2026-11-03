@@ -77,3 +77,9 @@ The workload replay now also tests an early new-team challenger. It requires two
 | NFL | Latest | 3 | 147 | 0.14558 | 0.12979 |
 
 The existing model had no estimate for 510 NBA and 113 NFL thresholds in the latest windows. These counts are correlated player-stat observations. The NBA result merits a prospective research comparison. These scores compare with the simple current-team reference, and a separate archived odds study is needed before using the challenger for picks.
+
+## Prospective NBA trade shadow trial
+
+Select **NBA trade shadow** in the Frozen Pregame Audit. The trial collects standard and alternate NBA half-point props for players with two to five appearances with the current team and at least five sourced appearances with another team in the current or previous season. The roster must identify the athlete and match the fixture, with a source timestamp within 48 hours. The latest prior appearance must already be with that team. Each game and book contributes up to 12 standard and 12 alternate lines, ranked by a stable market key. The audit uses the first archived capture between 60 and 45 minutes before tipoff.
+
+Each entry freezes the limited old-team estimate, the new-team-only estimate, the active estimate when available, the exact price, the paired no-vig benchmark when available, and roster provenance. The trade sample can capture lines where the active model is unavailable. Half-point lines support the two-outcome estimates tested in the retrospective study. The evaluation reports paired date-weighted Brier scores, distinct athletes and games, and coverage where the active model was unavailable. The public picks endpoint omits the trial.

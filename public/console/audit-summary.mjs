@@ -9,7 +9,25 @@ export function summarizeAudits(audits){
  const perDay=days.map(d=>({group:d.day,...score(d.rows)})),scored=rows.filter(r=>Number.isFinite(r.brier)&&Number.isFinite(r.scoringProbability));
  const bins=Array.from({length:5},(_,i)=>{const a=scored.filter(r=>r.scoringProbability>=i/5&&(i===4?r.scoringProbability<=1:r.scoringProbability<(i+1)/5));return {from:i/5,to:(i+1)/5,n:a.length,predicted:mean(a.map(r=>r.scoringProbability)),observed:a.length?a.filter(r=>r.outcome==='win').length/a.length:null};});
  const gaps=new Map();for(const r of rows){const reason=r.outcome==='unsettled'?r.settlementReason||'Unverified outcome':Number.isFinite(r.brier)||r.outcome==='push'?null:r.scoreReason||'Unscored settled outcome';if(reason)gaps.set(reason,(gaps.get(reason)||0)+1);}
- return {overall:score(rows),days:perDay,byLeague:groups('league'),byBook:groups('book'),byDecision:groups('label'),byModel:groups('modelVersion'),byStatistic:groups('stat'),byMarketType:groups('marketType'),bins,gaps:[...gaps].map(([reason,n])=>({reason,n})),completedDays:perDay.filter(d=>d.scored>0).length,shadowComparedDays:perDay.filter(d=>d.shadowPaired>0).length,dayEqualShadowDifference:mean(perDay.filter(d=>d.shadowPaired>0).map(d=>d.shadowDifference)),dayEqualBrier:mean(perDay.filter(d=>d.scored>0).map(d=>d.brier)),method:'Each frozen selection is scored once per slate by the audit. Books and alternate lines remain correlated. Day-equal Brier gives each scored date equal weight. The 50% benchmark always assigns probability 0.5; it is not a sportsbook forecast or betting strategy. Original-price comparisons include sportsbook margin and use only the same scored selections with saved valid odds; they are not a no-vig market forecast. Shadow comparisons use only paired, genuinely archived forecasts; negative shadow differences favor the challenger. Single-day, calibration-bin and small-group differences remain exploratory; no model promotion or profitability claim.'};
+ const tradeRows=rows.filter(r=>r.tradeEvidence);
+ const trade=auditTrade(tradeRows,audits.some(a=>a.scope==='trade'));
+ return {trade,overall:score(rows),days:perDay,byLeague:groups('league'),byBook:groups('book'),byDecision:groups('label'),byModel:groups('modelVersion'),byStatistic:groups('stat'),byMarketType:groups('marketType'),bins,gaps:[...gaps].map(([reason,n])=>({reason,n})),completedDays:perDay.filter(d=>d.scored>0).length,shadowComparedDays:perDay.filter(d=>d.shadowPaired>0).length,dayEqualShadowDifference:mean(perDay.filter(d=>d.shadowPaired>0).map(d=>d.shadowDifference)),dayEqualBrier:mean(perDay.filter(d=>d.scored>0).map(d=>d.brier)),method:'Each frozen selection is scored once per slate by the audit. Books and alternate lines remain correlated. Day-equal Brier gives each scored date equal weight. The 50% benchmark always assigns probability 0.5; it is not a sportsbook forecast or betting strategy. Original-price comparisons include sportsbook margin and use only the same scored selections with saved valid odds; they are not a no-vig market forecast. Shadow comparisons use only paired, genuinely archived forecasts; negative shadow differences favor the challenger. Single-day, calibration-bin and small-group differences remain exploratory; no model promotion or profitability claim.'};
+}
+function auditTrade(rows,enabled){
+ if(!enabled)return null;
+ const scored=rows.filter(r=>Number.isFinite(r.brier));
+ const days=[...new Set(scored.map(r=>r.day))];
+ const compare=get=>{
+  const paired=scored.filter(r=>Number.isFinite(get(r)));
+  const grouped=new Map();
+  for(const row of paired){
+   if(!grouped.has(row.day))grouped.set(row.day,[]);
+   grouped.get(row.day).push(row);
+  }
+  const slates=[...grouped.values()];
+  return {lines:paired.length,dates:slates.length,challenger:mean(slates.map(rr=>mean(rr.map(r=>r.brier)))),reference:mean(slates.map(rr=>mean(rr.map(get))))};
+ };
+ return {captured:rows.length,scored:scored.length,days:days.length,players:new Set(scored.map(r=>r.athleteID)).size,games:new Set(scored.map(r=>r.eventID)).size,pending:rows.filter(r=>r.outcome==='unsettled').length,withoutActive:rows.filter(r=>r.tradeEvidence.active===null).length,scoredWithoutActive:scored.filter(r=>r.tradeEvidence.active===null).length,currentOnly:compare(r=>r.tradeEvidence.currentOnlyBrier),active:compare(r=>r.tradeEvidence.activeBrier),market:compare(r=>r.marketBrier)};
 }
 export function auditDates(index,legacyDay='2026-11-02',now=new Date()){
  const today=now.toLocaleDateString('en-CA',{timeZone:'America/New_York'}),dates=new Map([[legacyDay,{day:legacyDay,snapshots:8,gameSnapshots:0}]]);

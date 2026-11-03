@@ -62,7 +62,7 @@ export default async function handler(req,res){try{
  if(route==='frozen-audit'){
   requirePro(access);if(req.method!=='GET')throw new AppError(405,'GET required.');
   const day=url.searchParams.get('day')||'2026-11-02';if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day))||new Date(day).toISOString().slice(0,10)!==day)throw new AppError(400,'Choose a valid audit date.');const scope=url.searchParams.get('scope')||'shortlist',gameScope=scope==='games';
-  if(!['shortlist','cohort','games'].includes(scope))throw new AppError(400,'Choose a supported audit group.');
+  if(!['shortlist','cohort','trade','games'].includes(scope))throw new AppError(400,'Choose a supported audit group.');
   const index=await snapshot('frozen-index.json',[]);let selected;try{selected=selectFrozenSources(index,!gameScope&&day==='2026-11-02'?frozenSources:[],day,{kind:gameScope?'games':'players'});}catch(e){throw new AppError(503,e.message);}
   let expandedBytes=0;const reports=await readFrozenSources(selected,async source=>{
    const r=await fetch(required('SUPABASE_URL')+'/storage/v1/object/authenticated/edgeboard/'+source.path,{headers:supaHeaders(true),signal:AbortSignal.timeout(15000)});
@@ -74,7 +74,7 @@ export default async function handler(req,res){try{
    const teamHistory=await snapshot('team-history.json',{});
    return json(res,200,{...auditFrozenGames(reports,teamHistory.games||[],{day}),coverage:`${selected.length} retained game-market snapshots. This group is evaluated separately from player props.`});
   }
-  const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day,scope}),coverage:`All ${selected.length} indexed or legacy retained snapshots for this date were read, with duplicate paths removed. No hourly sampling. ${scope==='cohort'?'Evaluation cohort includes supported standard and alternate props captured before shortlist filtering.':'This view covers published shortlists and watchlists.'} Results remain exploratory, not a calibration certificate or verified historical ROI.`});
+  const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day,scope}),coverage:`All ${selected.length} indexed or legacy retained snapshots for this date were read, with duplicate paths removed. No hourly sampling. ${scope==='trade'?'NBA trade trial captures exact half-point prop forecasts and dated roster evidence.':scope==='cohort'?'Evaluation cohort includes supported standard and alternate props captured before shortlist filtering.':'This view covers published shortlists and watchlists.'} Results remain exploratory, not a calibration certificate or verified historical ROI.`});
  }
  if(route==='research-workspace'){
   requirePro(access);const part=url.searchParams.get('part')||'meta';if(!['meta','quotes','records'].includes(part)||!['NBA','NFL'].includes(url.searchParams.get('league')||'NBA'))throw new AppError(400,'Choose a supported research scope.');let version=await snapshotRevision({fresh:part==='meta'});const expected=url.searchParams.get('version');if(expected&&expected!==version)version=await snapshotRevision({fresh:true});
