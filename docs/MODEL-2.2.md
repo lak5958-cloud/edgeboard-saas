@@ -38,3 +38,10 @@ A diagnostic replay on the saved verified team history (2026-11-03 UTC cutoff, h
 Lower Brier is better on these particular historical cohorts. These are development diagnostics, not independent prospective validation, statistical significance, a calibration certificate, or evidence of profitable betting. They do not validate the player-policy thresholds, and they do not enable game-market Lean or Take.
 
 First-to-score and last-to-score markets are not game-winner moneylines. Research labels their actual statistic and defaults scoring game tabs to points when offered. The public Game lines view excludes those unsupported specialty markets rather than relabeling them as winning the game.
+
+
+## Background refresh reliability
+
+Daily Picks updates preserve open evidence by exact event/player/market/line/book, including when shortlist ordering changes. A focused player search or filter is left in place for the next poll. Failed background reads keep the previously loaded cards and show a timestamp warning; they do not make old prices current. Public reads and paged Research reads abort after 45 seconds per request, without automatic retries of mutations. Poll cycles do not overlap, hidden tabs pause checks, and returning to the tab checks for updates.
+
+Game-line pages now report their visible range and allow both previous and next navigation. If a live update removes the page being viewed, the view returns to the first current page instead of showing an invalid-page error. Sportsbook changes reset player-specific and page filters. These changes do not alter forecast probabilities, research qualification rules, entitlements or payment configuration.

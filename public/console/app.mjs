@@ -1,3 +1,4 @@
+import {requestJson} from '../request.mjs';
 import {createWorkspaceReader} from './workspace-loader.mjs';
 import {normalizeBoardMarkets} from './board-markets.mjs';
 import {noVigIndex,evidenceIndex,singleFlight} from './browser-performance.mjs';
@@ -52,7 +53,7 @@ async function fetchJson(url){
 async function verifyRefreshServer(){const h=await fetchJson('/api/health');if(h.version!==expectedServerVersion||h.refreshSupported!==true)throw Error('The deployed research service is not compatible with this view. Reload the page before requesting a refresh.');return h;}
 
 async function optionalJson(file,empty=[]){try{return await fetchJson(file)}catch(err){if(file==='/data/evidence.auto.json')evidenceLoadError=err.message;if(file==='/api/model-report-summary')evaluationLoadError=err.message;if(file==='/data/historical-report.json')historicalLoadError=err.message;return empty}}
-const readWorkspace=createWorkspaceReader(async(url,{signal})=>{const r=await fetch(url,{cache:'no-store',signal});let result;try{result=await r.json()}catch{throw Error('The research service returned an unreadable response. Your previous view is retained.');}if(!r.ok)throw Object.assign(Error(result.error||'Research could not load.'),{status:r.status});return result;});
+const readWorkspace=createWorkspaceReader((url,{signal})=>requestJson(url,{signal}));
 async function load(force=false){const id=++loadSerial,key=league+'|'+game,keepSelection=workspaceKey===key&&!!workspaceVersion;workspaceBusy=true;$('syncStatus').textContent='Checking published data…';
  try{const result=await readWorkspace({league,game,force:!!force,knownVersion:keepSelection?workspaceVersion:null});if(!result||id!==loadSerial)return false;
   if(result.unchanged){if(picksView.active)picksView.update();else showQuote();const fresh=dataset().filter(q=>q.league===league&&q.book==='draftkings'&&hasCurrent(q));$('dataIntegrity').textContent=fresh.length?`${fresh.length} verified DraftKings quotes`:'No current DraftKings prices';$('freshState').textContent=fresh.length?'Price and timestamp checked · models not calibrated':'Missing, stale, closed or started; wait for current prices';$('syncStatus').textContent='Up to date · checked '+new Date().toLocaleTimeString();return true;}
@@ -283,7 +284,8 @@ async function saveEntry(endpoint,obj,statusId){const r=await fetch(endpoint,{me
 $('outsideForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.target,o=Object.fromEntries(new FormData(form));o.league=league;o.game=game;o.periodID=o.periodID||period||'unknown';o.published_utc=o.published_utc?o.published_utc+'T12:00:00Z':new Date().toISOString();try{await saveEntry('/api/outside-picks',o,'pickSaveState');form.reset();$('outsideForm').classList.add('hidden');}catch(err){$('pickSaveState').textContent=err.message;}});
 $('noteForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.target,o=Object.fromEntries(new FormData(form));o.league=league;o.game=game;o.periodID=period||'unknown';o.date=new Date().toISOString().slice(0,10);o.channel='User-referenced research';try{await saveEntry('/api/research-notes',o,'noteSaveState');form.reset();$('noteForm').classList.add('hidden');}catch(err){$('noteSaveState').textContent=err.message;}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!workspaceBusy)void load();});
-void load();setInterval(()=>{if(!document.hidden&&!refreshRunning&&!workspaceBusy)void load();},60000);
+const refreshVisibleWorkspace=()=>{if(!document.hidden&&!refreshRunning&&!workspaceBusy)void load();};
+void load();setInterval(refreshVisibleWorkspace,60000);document.addEventListener('visibilitychange',refreshVisibleWorkspace);
 
 function schedulePlayerHistory(q){/* Player histories are loaded by matchup from the published server snapshot. */}
 
