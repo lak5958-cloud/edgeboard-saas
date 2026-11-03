@@ -47,3 +47,18 @@ test('paired scores give each date equal weight and compare the active model onl
  assert.equal(t.market.lines,3);
  assert.equal(t.scoredWithoutActive,3);
 });
+test('trade diagnostics distinguish the capture window, quote availability and roster failures',async()=>{
+ const report=await buildDailyPicks(data,{now});
+ const d=report.tradeDiagnostics.find(r=>r.book==='draftkings');
+ assert.equal(d.insideWindow,true);
+ assert.equal(d.examined,3);
+ assert.equal(d.captured,2);
+ assert.equal(d.trialExclusions.unsupportedLine,1);
+ assert.equal(report.tradeDiagnostics.find(r=>r.book==='fanduel').quotes,0);
+ const read=(report,savedAt)=>auditFrozen([{report,savedAt,path:'test'}],[],{day:'2026-11-02',scope:'trade',now:new Date('2026-11-03T12:00Z')}).captureDiagnostics.groups[0];
+ assert.equal(read(report,'2026-11-02T23:05Z').retainedWindowChecks,1);
+ assert.equal(read(report,'2026-11-02T23:16Z').retainedWindowChecks,0);
+ const future={...profile,asOf:'2026-11-03T01:00Z'};
+ const bad=await buildDailyPicks({...data,context:{rosters:[future]}},{now});
+ assert.equal(bad.tradeDiagnostics[0].trialExclusions.rosterUnverified,2);
+});
