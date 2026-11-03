@@ -1,0 +1,2 @@
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export function inputAuditView(audit){if(!audit?.rows?.length)return '';return `<details class="pickTechnical"><summary>What actually affects this estimate?</summary>${audit.rows.map(r=>`<p><b>${esc(r.label)} · ${esc(r.status)}</b><br>${esc(r.detail)}</p>`).join('')}<p>${esc(audit.method)}</p></details>`;}

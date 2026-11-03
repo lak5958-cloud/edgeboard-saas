@@ -26,6 +26,6 @@ test('empty fumble categories require the same team summary to explicitly certif
 test('old completed NFL events are reprocessed once when their fantasy import schema changes',async()=>{
  const id=String(fixture.header.id),at=now.toISOString(),d={rosters:[],autoRecords:[],fantasyLogs:[],context:{injuries:[],teamGames:[]},schedule:{games:[]}},state={NBATeamsAt:at,NFLTeamsAt:at,events:{['NFL|'+id]:{league:'NFL',gameID:id,date:'2026-09-01',done:true,checkedAt:at,fantasySchemaVersion:1}}};
  const r=await collectSports(d,state,{now,maxEvents:1,get:async u=>u.includes('/injuries')?{injuries:[]}:structuredClone(fixture)});
- assert.equal(r.processed,1);assert.equal(r.state.events['NFL|'+id].fantasySchemaVersion,2);assert.equal(r.state.pending,0);
+ assert.equal(r.processed,1);assert.equal(r.state.events['NFL|'+id].fantasySchemaVersion,2);assert.equal(r.state.events['NFL|'+id].opportunitySchemaVersion,1);assert(r.updates['evidence.auto.json'].every(row=>row.games.every(g=>g.opportunities&&Object.hasOwn(g.opportunities,'passingAttempts'))));assert.equal(r.state.pending,0);
  const again=await collectSports({...d,autoRecords:r.updates['evidence.auto.json'],fantasyLogs:r.updates['fantasy-game-logs.json']},r.state,{now,maxEvents:1,get:async()=>({injuries:[]})});assert.equal(again.processed,0);
 });

@@ -1,0 +1,4 @@
+const key=s=>String(s||'').toLowerCase().replace(/[^a-z]/g,''),number=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
+export function opportunityKind(stat){const s=key(stat);if(/rush/.test(s)&&/rec/.test(s))return null;if(s.startsWith('passing'))return 'passingAttempts';if(s.startsWith('rushing'))return 'rushingAttempts';if(s.startsWith('receiving')||s==='receptions')return 'targets';return null;}
+export function measuredOpportunities(stats){const entries=new Map(Object.entries(stats||{}).map(([k,v])=>[key(k),v]));return {targets:number(entries.get('receivingtargets')??entries.get('targets')),rushingAttempts:number(entries.get('rushingattempts')),passingAttempts:number(entries.get('passingattempts'))};}
+export function readOpportunity(row,stat){const kind=opportunityKind(stat);if(!kind)return null;return number(row.opportunities?.[kind]??(row.opportunityKind===kind?row.opportunity:null));}
