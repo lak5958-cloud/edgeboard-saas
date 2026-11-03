@@ -43,6 +43,10 @@
     {
       "source": "/privacy",
       "destination": "/index.html"
+    },
+    {
+      "source": "/testing",
+      "destination": "/index.html"
     }
   ],
   "headers": [

@@ -4,7 +4,7 @@ const num=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x)),mean=a=
 export function fitFootball(rows,q,year,teamID=null){
  const known=teamID||rows.at(-1)?.teamID,current=rows.filter(r=>r.seasonYear===year&&(!known||String(r.teamID)===String(known))),prior=rows.filter(r=>r.seasonYear===year-1&&known&&String(r.teamID)===String(known));
  const cm=current.slice(-3).map(r=>readOpportunity(r,q.stat)).filter(num),pm=prior.slice(-10).map(r=>readOpportunity(r,q.stat)).filter(num);
- const opportunityShift=cm.length>=3&&pm.length>=5&&mean(pm)>0&&Math.abs(mean(cm)/mean(pm)-1)>.25;
+ const opportunityShift=cm.length>=3&&pm.length>=5&&(mean(pm)===0?mean(cm)>0:mean(pm)>0&&Math.abs(mean(cm)/mean(pm)-1)>.25);
  return {...fitSeason(rows,q,year,known,{priorStrength:opportunityShift?0:10,minimumPriorCombined:12}),opportunityShift,opportunityKind:opportunityKind(q.stat),currentOpportunityN:cm.length,priorOpportunityN:pm.length,currentOpportunityMean:mean(cm),priorOpportunityMean:mean(pm),opportunityVerified:cm.length>=3&&pm.length>=5};
 }
 export function footballBacktest(rows,q){
