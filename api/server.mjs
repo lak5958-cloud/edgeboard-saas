@@ -51,6 +51,12 @@ export default async function handler(req,res){try{
  if(route==='data-status'){const status=await snapshot('refresh-status.json',{});return json(res,200,{...status,oddsConfigured:!!process.env.SPORTSGAMEODDS_API_KEY,scheduledIntervalMinutes:10});}
  if(route==='game-markets'){const [report,live]=await Promise.all([snapshot('daily-game-markets.json',{}),snapshot('live-data.json',{})]);return json(res,200,publicGameMarkets(report,live,Object.fromEntries(url.searchParams)));}
  if(route==='pick-markets'){const [live,profiles]=await Promise.all([snapshot('live-data.json',{}),snapshot('roster-cache.json',[])]);return json(res,200,availablePickMarkets(live,profiles,Object.fromEntries(url.searchParams)));}
+ if(route==='slate-readiness'){
+  const league=url.searchParams.get('league')||'NBA',book=url.searchParams.get('book')||'draftkings';
+  if(!['NBA','NFL'].includes(league)||!['draftkings','fanduel'].includes(book))throw new AppError(400,'Choose a supported sport and sportsbook.');
+  const report=await snapshot('daily-picks.json',{}),readiness=report.slateReadiness;
+  return json(res,200,readiness?{checkedAt:readiness.checkedAt,today:readiness.today,tomorrow:readiness.tomorrow,rows:readiness.rows.filter(r=>r.league===league&&r.book===book),stale:Date.now()-Date.parse(readiness.checkedAt)>20*60000}:{checkedAt:null,rows:[]});
+ }
  if(route==='picks'){const league=url.searchParams.get('league')||'NBA';if(!['NBA','NFL'].includes(league))throw new AppError(400,'Choose NBA or NFL.');const report=await snapshot('daily-picks.json',{});return json(res,200,publicDailyPicks(report,league,new Date(),url.searchParams.get('book')||'draftkings'));}
  const access=await accessFor(req,res);
  if(route==='access/redeem'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in before redeeming an access code.');await budget(req,'access-code',10);await budget(req,'access-code-user-'+access.user.id,10);const b=JSON.parse((await rawBody(req)).toString());return json(res,200,await redeemAccessCode(access.user,b?.code));}

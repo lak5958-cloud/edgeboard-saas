@@ -62,3 +62,56 @@ test('trade diagnostics distinguish the capture window, quote availability and r
  const bad=await buildDailyPicks({...data,context:{rosters:[future]}},{now});
  assert.equal(bad.tradeDiagnostics[0].trialExclusions.rosterUnverified,2);
 });
+
+test('simulated provider refresh publishes immutable odds and audit refuses conflicting outcomes',async t=>{
+ const {normalizeEvents}=await import('../lib/odds-provider.mjs');
+ const {publishUpdates}=await import('../lib/refresh.mjs');
+ const {snapshot,clearSnapshotCache}=await import('../lib/cloud.mjs');
+ const {decodeSnapshot}=await import('../lib/snapshot-pages.mjs');
+ const {compareBooks}=await import('../public/console/books.mjs');
+ const {slateReadiness}=await import('../lib/slate-readiness.mjs');
+ const start=game.start,observedAt=now.toISOString();
+ const odds=Object.fromEntries(['over','under'].map(side=>['points-provider100-game-ou-'+side,{byBookmaker:{draftkings:{odds:-110,overUnder:15.5,available:true},fanduel:{odds:110,overUnder:15.5,available:true}}}]));
+ const event={leagueID:'NBA',eventID:'g',status:{startsAt:start},teams:{home:{abbreviation:'BOS'},away:{abbreviation:'NY'}},players:{provider100:{name:profile.subject}},odds};
+ const next={...event,eventID:'tomorrow',status:{startsAt:'2026-11-04T00:00Z'}};
+ const live=normalizeEvents([event,next],observedAt);
+ const readiness=slateReadiness({...data,live},now);
+ assert.equal(readiness.rows.find(r=>r.day==='2026-11-03'&&r.book==='fanduel').playersWithHistory,1);
+ const q=live.quotes.find(q=>q.eventID==='g'&&q.book==='draftkings');
+ const prices=compareBooks(q,[...live.quotes,{...q,line:16.5,book:'fanduel',odds:300}],game,now);
+ assert.equal(prices.length,2);
+ assert(prices.find(p=>p.book==='fanduel').breakEvenChange<0);
+ const report=await buildDailyPicks({...data,live},{now});
+ t.mock.timers.enable({apis:['Date'],now:now.getTime()+60000});
+ const prior={url:process.env.SUPABASE_URL,key:process.env.SUPABASE_SERVICE_ROLE_KEY};
+ process.env.SUPABASE_URL='https://synthetic.supabase.co';
+ process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic';
+ const objects=new Map([['manifest.json',JSON.stringify({files:{}})]]);
+ t.mock.method(globalThis,'fetch',async (url,options={})=>{
+  const pathname=new URL(url).pathname;
+  if(pathname.startsWith('/rest/v1/refresh_jobs'))return Response.json([{token:'lease'}]);
+  const key=pathname.split('/edgeboard/')[1];
+  if(options.method==='POST'){objects.set(key,options.body);return Response.json({ok:true});}
+  return objects.has(key)?new Response(objects.get(key)):new Response('',{status:404});
+ });
+ try{
+  clearSnapshotCache();
+  await publishUpdates({'live-data.json':live,'daily-picks.json':report},'lease');
+  const index=await snapshot('frozen-index.json',[]);
+  assert.equal(index.length,1);
+  const info=JSON.parse(objects.get('manifest.json')).files['daily-picks.json'];
+  const saved=decodeSnapshot(objects.get(index[0].path),info);
+  assert.equal(saved.tradeCohort.length,4);
+  const reports=[{...index[0],report:saved}],day='2026-11-02';
+  const audit=(games)=>auditFrozen(reports,[{...record,games:[...record.games,...games]}],{day,scope:'trade',now:new Date('2026-11-03T12:00Z')});
+  const final=row('2026-11-03','new',20);
+  assert.equal(audit([final]).scored,4);
+  assert.equal(audit([final,{...final,value:3}]).unsettled,4);
+  assert.equal(auditFrozen([{...reports[0],savedAt:'2026-11-02T23:16Z'}],[record],{day,scope:'trade',now:new Date('2026-11-03T12:00Z')}).results.length,0);
+ }finally{
+  for(const [key,value] of [['SUPABASE_URL',prior.url],['SUPABASE_SERVICE_ROLE_KEY',prior.key]]){
+   if(value===undefined)delete process.env[key];else process.env[key]=value;
+  }
+  clearSnapshotCache();
+ }
+});

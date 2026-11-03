@@ -3,6 +3,7 @@
 ## Before the games
 
 - [ ] Open Daily Picks and select NBA and DraftKings or FanDuel.
+- [ ] Expand **Today and tomorrow · slate readiness** to see quote, roster and history coverage by game.
 - [ ] Verify November 4 matchups and recent quote timestamps. Check the exact line and price at your chosen sportsbook.
 - [ ] Open Research for any selection you are evaluating. Check roster identity, availability and historical workload. Treat unconfirmed availability as unknown.
 - [ ] Read the reason for Lean or Pass at that price. A Lean cleared the research checks and the accuracy evidence is still limited.
