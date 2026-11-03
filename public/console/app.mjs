@@ -102,7 +102,7 @@ function refreshSelectors(){
  const byPerson=filtered.filter(q=>kindWanted==='Player Prop'?sameName(q.player,subject):q.player===subject);
  const stats=uniq(byPerson.map(q=>q.stat));if(!stats.length&&kindWanted==='Player Prop'&&subject)stats.push(...uniq([...(league==='NFL'?['passing_yards','rushing_yards','receiving_yards','receiving_receptions','receiving_longestReception']:['points','rebounds','assists','points+rebounds','points+assists','points+rebounds+assists','threePointersMade']),...evidence.filter(e=>e.league===league&&sameName(e.subject,subject)).map(e=>e.stat)]));
  const statOptions=stats.map(id=>({value:id,label:statLabel(id,league)}));
- stat=selectOptions('stat',statOptions,stat||[...playerRecordsFor({league,player:subject})].sort((a,b)=>(b.games?.length||0)-(a.games?.length||0))[0]?.stat);
+ stat=selectOptions('stat',statOptions,(stats.includes(stat)?stat:kindWanted!=='Player Prop'&&stats.includes('points')?'points':stat)||[...playerRecordsFor({league,player:subject})].sort((a,b)=>(b.games?.length||0)-(a.games?.length||0))[0]?.stat);
  const periods=uniq(byPerson.filter(q=>q.stat===stat).map(q=>quotePeriod(q)));if(!periods.length&&kindWanted==='Player Prop'&&subject)periods.push('game');
  // Prefer full-game props unless user explicitly chose a different period.
  period=selectOptions('period',periods.map(id=>({value:id,label:periodLabel(id)})),period||'game');
@@ -136,7 +136,7 @@ function renderMarket(){activeQuotes=distinctLines(selectedQuotes());const main=
  if(selectedLine===null||(!preserveSelection&&!activeQuotes.some(q=>String(q.line)===String(selectedLine))))selectedLine=main?.line??null;
  const i=activeQuotes.findIndex(q=>String(q.line)===String(selectedLine));$('slider').max=String(Math.max(0,activeQuotes.length-1));$('slider').value=String(Math.max(0,i));$('slider').disabled=activeQuotes.length<2;
  $('prevAlt').disabled=i<=0;$('nextAlt').disabled=i<0||i>=activeQuotes.length-1;
- $('minline').textContent=kindWanted==='Moneyline'?'Win the game':activeQuotes.length?activeQuotes[0].line:'—';$('maxline').textContent=activeQuotes.length?activeQuotes[activeQuotes.length-1].line:'—';$('altCount').textContent=kindWanted==='Moneyline'?'Exact offered moneyline price':activeQuotes.length?`${activeQuotes.length} distinct quoted thresholds`:'No market thresholds available';
+ $('minline').textContent=kindWanted==='Moneyline'?(stat==='points'||stat==='score'?'Win the game':'Win this market'):activeQuotes.length?activeQuotes[0].line:'—';$('maxline').textContent=activeQuotes.length?activeQuotes[activeQuotes.length-1].line:'—';$('altCount').textContent=kindWanted==='Moneyline'?'Exact offered moneyline price':activeQuotes.length?`${activeQuotes.length} distinct quoted thresholds`:'No market thresholds available';
  $('lineTiles').innerHTML=activeQuotes.length>1?activeQuotes.map((q,idx)=>`<button data-index="${idx}" class="${i===idx?'active':''}">${esc(q.kind==='Spread'&&Number(q.line)>0?'+':'')}${esc(q.line)}<span>${esc(odds(q.odds))}</span></button>`).join(''):'';
  $('lineTiles').querySelectorAll('button').forEach(b=>b.onclick=()=>selectIndex(Number(b.dataset.index)));
  showQuote();

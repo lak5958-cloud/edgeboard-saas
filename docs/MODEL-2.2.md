@@ -8,7 +8,7 @@ The latest season/team empirical model may produce an experimental estimate befo
 
 ## Game markets
 
-Full-game moneyline, spread, total and team-total analysis uses verified paired team results. Both team scores, opponent identity, explicit home/away or venue metadata, regular-season tags, sources, dates and duplicate/conflict checks are required. NBA abbreviation aliases are normalized before matching. A team statistic is never substituted with a player statistic.
+Full-game scoring moneyline, spread, total and team-total analysis uses verified paired team results. Both team scores, opponent identity, explicit home/away or venue metadata, regular-season tags, sources, dates and duplicate/conflict checks are required. NBA abbreviation aliases are normalized before matching. A team statistic is never substituted with a player statistic.
 
 The new experimental score model fits a league baseline, home advantage, team attack and opposing defense with a fixed ridge penalty of eight weighted games. Current season weight is 1, prior season 0.35, and older season 0.15. Weights and penalty are declared, not optimized to obtain a particular pick. At least forty league fixtures, twelve earlier-only matchup errors and three current-season games for each team are required. No odds are used in score fitting.
 
@@ -36,3 +36,5 @@ A diagnostic replay on the saved verified team history (2026-11-03 UTC cutoff, h
 | NBA | 1,323 | 80 | 61 | 0.1414 | 0.1740 |
 
 Lower Brier is better on these particular historical cohorts. These are development diagnostics, not independent prospective validation, statistical significance, a calibration certificate, or evidence of profitable betting. They do not validate the player-policy thresholds, and they do not enable game-market Lean or Take.
+
+First-to-score and last-to-score markets are not game-winner moneylines. Research labels their actual statistic and defaults scoring game tabs to points when offered. The public Game lines view excludes those unsupported specialty markets rather than relabeling them as winning the game.
