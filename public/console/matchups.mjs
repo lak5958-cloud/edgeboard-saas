@@ -11,7 +11,7 @@ export function summaryTeams(p){
   const fga=total('field goals attempted'),fta=total('free throws attempted'),turnovers=total('turnovers'),orb=total('offensive rebounds'),minutes=total('minutes');
   if(!(minutes>0))return [];
   const stats={};for(const key of ['points','rebounds','assists','3-pointers made','steals','blocks'])if(pp.every(x=>num(x.stats[key])))stats[normalizeStat(key)]=total(key);
-  teams.push({league:'NBA',seasonType:'regular',gameID:id,date,seasonYear:seasonYear('NBA',date),teamID:String(competitor.team.id),team:code,points,minutes,fga,fta,turnovers,orb,stats,source:url});
+  teams.push({league:'NBA',home:competitor.homeAway==='home',seasonType:'regular',gameID:id,date,seasonYear:seasonYear('NBA',date),teamID:String(competitor.team.id),team:code,points,minutes,fga,fta,turnovers,orb,stats,source:url});
  }
  if(teams.length!==2)return [];const possessions=avg(teams.map(t=>t.fga+.44*t.fta-t.orb+t.turnovers));if(!(possessions>0))return [];
  return teams.map((t,i)=>({...t,opponentID:teams[1-i].teamID,allowed:teams[1-i].stats,pointsAllowed:teams[1-i].points,possessions,pace:t.minutes>0?possessions*240/t.minutes:null,defensiveRating:teams[1-i].points/possessions*100}));
