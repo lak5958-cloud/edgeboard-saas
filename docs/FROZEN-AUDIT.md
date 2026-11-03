@@ -45,3 +45,35 @@ The local November 2 pilot found a dated odds board and produced 1,326 prop fore
 The box-score replay reports results separately for recorded debut-year players, players with another observed team, established players and cases without a known debut year. First observed team transitions are tracked as excluded coverage. No recorded debut-year cohort qualified in the local replay. Run the same script with `--team-history team-history.json` to test the NBA opponent points-allowed adjustment on matched forecasts. The local central-line Brier scores were 0.24103 active and 0.24062 adjusted on 7,642 correlated thresholds. Pace and injury tests still require adequate dated coverage.
 
 The pilot accepts an optional fifth input with verified audit outcome rows. They are joined by saved event and athlete identity and used only to grade outcomes. With the November 2 verified outcome rows, 43 reconstructed props were scored. Active Brier was 0.37503 and quoted-price Brier was 0.25487 on the same rows. These rows share players and games and inherit the original shortlist coverage. The other 1,283 prop forecasts and 300 game forecasts remained pending in that run.
+
+## Multiple historical slates and early games after a team change
+
+Run `node scripts/replay-odds-series.mjs manifest.json` with one observation per Eastern slate. Declare the final evaluation start date before looking at scores. File paths are relative to the manifest. Each slate requires a dated board, evidence, roster and team history. Verified outcome rows are optional and affect settlement only.
+
+```json
+{
+  "holdoutFrom": "2026-11-03",
+  "slates": [
+    {
+      "board": "nov02/board.json",
+      "evidence": "nov02/evidence.json",
+      "rosters": "nov02/rosters.json",
+      "teamHistory": "team-history.json",
+      "verifiedOutcomes": "nov02/audit-outcomes.json"
+    }
+  ]
+}
+```
+
+The report compares model and original price on matched outcomes. It weights each scored date equally and separates props from game lines. The available data only populated November 2. The final evaluation window has zero scored dates.
+
+The workload replay now also tests an early new-team challenger. It requires two to five current-team games and at least five earlier appearances with another team in the current or previous season. It compares a smoothed current-team hit rate with the same estimate plus two effective old-team appearances. The last 20% of eligible dates per league form a separate retrospective window. Game thresholds come from earlier box scores. The first observed team-change game remains excluded because a dated pregame roster is required to establish the new team at that cutoff.
+
+| League | Window | Dates | Matched thresholds | Current-team only Brier | Limited old-team Brier |
+| --- | --- | ---: | ---: | ---: | ---: |
+| NBA | Earlier | 22 | 870 | 0.26532 | 0.25189 |
+| NBA | Latest | 6 | 645 | 0.27915 | 0.24156 |
+| NFL | Earlier | 12 | 329 | 0.16094 | 0.16190 |
+| NFL | Latest | 3 | 147 | 0.14558 | 0.12979 |
+
+The existing model had no estimate for 510 NBA and 113 NFL thresholds in the latest windows. These counts are correlated player-stat observations. The NBA result merits a prospective research comparison. These scores compare with the simple current-team reference, and a separate archived odds study is needed before using the challenger for picks.

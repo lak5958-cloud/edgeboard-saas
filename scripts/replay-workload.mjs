@@ -1,3 +1,4 @@
+import {tradeReplayForecast} from '../lib/trade-replay.mjs';
 // Offline retrospective research. All thresholds are generated from earlier box scores.
 import fs from 'node:fs';
 import {normalizeSeasonGame} from '../lib/seasons.mjs';
@@ -49,7 +50,7 @@ for(const path of paths) for(const r of JSON.parse(fs.readFileSync(path,'utf8'))
  }
 }
 const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
-const scores=new Map(),coverage=new Map();
+const scores=new Map(),coverage=new Map(),tradeDays=new Map();
 let transitions=0;
 for(const {league,stat,rows,debutYear} of series.values()){
  const ordered=[...rows.values()].filter(Boolean).sort((a,b)=>a.date.localeCompare(b.date));
@@ -73,6 +74,18 @@ for(const {league,stat,rows,debutYear} of series.values()){
   for(const [type,line] of [['central',center+.5],['higher',center+.5+Math.max(1,Math.round(center*.2))]]){
    const q={stat,side:'over',line};
    const active=league==='NBA'?fitSeason(past,q,target.seasonYear,team):fitFootball(past,q,target.seasonYear,team);
+   if(type==='central'&&current.length<=5){
+    const trade=tradeReplayForecast(past,team,target.seasonYear,line);
+    if(trade){
+     const key=JSON.stringify([league,target.date]),actual=Number(target.value>line);
+     if(!tradeDays.has(key))tradeDays.set(key,{league,day:target.date,n:0,withoutActive:0,currentError:0,oldError:0});
+     const row=tradeDays.get(key);
+     row.n++;
+     row.withoutActive+=Number(!active.available);
+     row.currentError+=(trade.currentOnly-actual)**2;
+     row.oldError+=(trade.limitedOldTeam-actual)**2;
+    }
+   }
    if(!active.available)continue;
    if(type==='central')count.forecast++;
    const shorter=fitSeason(past,q,target.seasonYear,team,{priorStrength:active.priorStrength?5:0,minimumPriorCombined:league==='NBA'?20:12});
@@ -90,4 +103,13 @@ for(const {league,stat,rows,debutYear} of series.values()){
   }
  }
 }
-console.log(JSON.stringify({series:series.size,transitionsExcluded:transitions,coverage:[...coverage.values()],results:[...scores.values()].map(r=>({...r,active:r.active/r.n,challenger:r.challenger/r.n})),method:'Chronological box-score replay with synthetic thresholds based on earlier results. Paired Brier scores. No archived odds, injuries or projected workload assumed. Optional NBA points-allowed challenger uses earlier verified team scores and the scheduled opponent.'},null,2));
+const tradeEvaluation=[];
+for(const league of ['NBA','NFL']){
+ const days=[...tradeDays.values()].filter(r=>r.league===league).sort((a,b)=>a.day.localeCompare(b.day));
+ const split=Math.floor(days.length*.8);
+ for(const [window,rows] of [['earlier',days.slice(0,split)],['latest 20% of dates',days.slice(split)]]){
+  const n=rows.reduce((total,row)=>total+row.n,0);
+  tradeEvaluation.push({league,window,first:rows[0]?.day??null,last:rows.at(-1)?.day??null,dates:rows.length,n,withoutActive:rows.reduce((total,row)=>total+row.withoutActive,0),dayEqualCurrentOnly:n?mean(rows.map(r=>r.currentError/r.n)):null,dayEqualLimitedOldTeam:n?mean(rows.map(r=>r.oldError/r.n)):null});
+ }
+}
+console.log(JSON.stringify({tradeEvaluation,series:series.size,transitionsExcluded:transitions,coverage:[...coverage.values()],results:[...scores.values()].map(r=>({...r,active:r.active/r.n,challenger:r.challenger/r.n})),method:'Chronological box-score replay with synthetic thresholds based on earlier results. Paired Brier scores. No archived odds, injuries or projected workload assumed. Optional NBA points-allowed challenger uses earlier verified team scores and the scheduled opponent.'},null,2));
