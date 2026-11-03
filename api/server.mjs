@@ -1,3 +1,7 @@
+import {auditFrozen} from '../lib/frozen-audit.mjs';
+import {frozenSources} from '../lib/frozen-sources.mjs';
+import {gunzipSync} from 'node:zlib';
+import {supaHeaders} from '../lib/cloud.mjs';
 import {redeemAccessCode} from '../lib/access-code.mjs';
 import {publicGameMarkets} from '../lib/game-markets.mjs';
 import {tradeEvidence,groundedBrief,briefPrompt} from '../lib/ai-evidence.mjs';
@@ -35,7 +39,7 @@ export default async function handler(req,res){try{
  if(route==='ai/brief'){
   if(req.method!=='POST')throw new AppError(405,'POST required.');const access=await accessFor(req,res);if(!access.user)throw new AppError(401,'Sign in for an AI trade brief.');await budget(req,'ai-'+access.user.id,access.pro?20:3);
   const b=JSON.parse((await rawBody(req)).toString()),trade=analyzeTrade(await bundle(),b);
-  required('AI_MODEL');const evidence=tradeEvidence(trade);
+  required('AI_MODEL');const evidence=tradeEvidence(trade,{pro:access.pro});
   const result=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+required('OPENAI_API_KEY'),'Content-Type':'application/json'},body:JSON.stringify(briefPrompt(evidence))});
   const selected=JSON.parse(result.choices?.[0]?.message?.content||'{}'),brief=groundedBrief(evidence,selected);return json(res,200,{brief,provider:'OpenAI',model:process.env.AI_MODEL,recommendation:trade.recommendation,method:'AI prioritizes existing evidence; the server renders verified facts. No AI probabilities or revised recommendations.',sources:[...new Set([...trade.give,...trade.receive].flatMap(p=>p.sources))]});
  }
@@ -48,6 +52,11 @@ export default async function handler(req,res){try{
  if(route==='billing/review'){if(!access.owner)throw new AppError(403,'Owner access required.');if(req.method==='POST'){const b=JSON.parse((await rawBody(req)).toString());if(!/^evt_[A-Za-z0-9]+$/.test(b.id||''))throw new AppError(400,'Invalid billing event.');await sb('/rest/v1/billing_events?id=eq.'+encodeURIComponent(b.id),{method:'PATCH',body:JSON.stringify({review_required:false,result:'Owner marked reviewed. No automatic monetary action.'})});return json(res,200,{reviewed:true});}return json(res,200,{events:await sb('/rest/v1/billing_events?review_required=eq.true&order=created_at.desc&limit=20')});}
  if(route==='billing/checkout'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in before checkout.');if(access.pro)throw new AppError(409,'You already have Pro access. No new subscription is needed.');await budget(req,'checkout',10);const s=await checkout(access.user);return json(res,200,{url:s.url});}
  if(route==='billing/portal'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in first.');const rows=await sb('/rest/v1/entitlements?user_id=eq.'+encodeURIComponent(access.user.id)+'&kind=eq.subscription&select=customer_id');if(!rows[0]?.customer_id)throw new AppError(400,'No billing account found.');const p=await stripe('billing_portal/sessions',{customer:rows[0].customer_id,return_url:required('APP_URL')+'/account',...(process.env.STRIPE_PORTAL_CONFIGURATION_ID?{configuration:process.env.STRIPE_PORTAL_CONFIGURATION_ID}:{})});return json(res,200,{url:p.url});}
+ if(route==='frozen-audit'){
+  requirePro(access);if(req.method!=='GET')throw new AppError(405,'GET required.');
+  const reports=await Promise.all(frozenSources.map(async source=>{const r=await fetch(required('SUPABASE_URL')+'/storage/v1/object/authenticated/edgeboard/'+source.path,{headers:supaHeaders(true),signal:AbortSignal.timeout(15000)});if(!r.ok)throw new AppError(503,'A retained pregame snapshot could not be read. No results were inferred.');const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');return {...source,report:JSON.parse(gunzipSync(bytes,{maxOutputLength:20000000}).toString())};}));
+  const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day:'2026-11-02'}),coverage:'Eight retained afternoon snapshots only. This is an exploratory shortlist audit, not a complete slate, independent calibration certificate or historical ROI.'});
+ }
  if(route==='research-workspace'){
   requirePro(access);const part=url.searchParams.get('part')||'meta';if(!['meta','quotes','records'].includes(part)||!['NBA','NFL'].includes(url.searchParams.get('league')||'NBA'))throw new AppError(400,'Choose a supported research scope.');let version=await snapshotRevision({fresh:part==='meta'});const expected=url.searchParams.get('version');if(expected&&expected!==version)version=await snapshotRevision({fresh:true});
   if(expected&&expected!==version)throw new AppError(409,'Published data changed during this read. Reloading the latest complete snapshot.');
