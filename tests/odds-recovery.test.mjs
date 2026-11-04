@@ -23,3 +23,28 @@ test('rate limits are reported without retry or leaking the provider response',a
  assert.equal(result.board,undefined);
  assert.doesNotMatch(result.message,/private detail/);
 });
+
+test('shared odds budget blocks pagination without publishing a partial board',async()=>{
+ const {budgetedOddsRefresh}=await import('../lib/refresh.mjs');
+ const reservations=[];
+ let requests=0;
+ const r=await budgetedOddsRefresh('test',async()=>{requests++;return {data:[event],nextCursor:'second'};},async(scope,max)=>{reservations.push([scope,max]);return reservations.length<3;},{SPORTSGAMEODDS_DAILY_REFRESH_CAP:'50',SPORTSGAMEODDS_DAILY_REQUEST_CAP:'7'});
+ assert.equal(requests,1);
+ assert.deepEqual(reservations,[['pull',50],['request',7],['request',7]]);
+ assert.equal(r.code,'daily-budget');
+ assert.equal(r.board,undefined);
+});
+test('refresh cap and malformed budget configuration prevent a provider call',async()=>{
+ const {budgetedOddsRefresh}=await import('../lib/refresh.mjs');
+ const get=()=>assert.fail('provider call was made');
+ assert.equal((await budgetedOddsRefresh('test',get,async()=>false,{SPORTSGAMEODDS_DAILY_REFRESH_CAP:'3'})).code,'daily-budget');
+ assert.equal((await budgetedOddsRefresh('test',get,async()=>true,{SPORTSGAMEODDS_DAILY_REQUEST_CAP:'bad'})).code,'budget-config');
+});
+test('Eastern schedule prevents off-hours pulls and reserves one shared hourly slot',async()=>{
+ const {budgetedOddsRefresh}=await import('../lib/refresh.mjs');
+ const env={SPORTSGAMEODDS_REFRESH_HOURS_ET:'17,19'};
+ const reserve=async(scope,max,window)=>{assert.deepEqual([scope,max,window],['slot',1,3600]);return false;};
+ const get=()=>assert.fail('provider call was made');
+ assert.equal((await budgetedOddsRefresh('test',get,()=>assert.fail('reserved outside window'),env,new Date('2026-11-04T20:00Z'))).code,'scheduled-odds');
+ assert.equal((await budgetedOddsRefresh('test',get,reserve,env,new Date('2026-11-04T22:00Z'))).code,'scheduled-odds');
+});
