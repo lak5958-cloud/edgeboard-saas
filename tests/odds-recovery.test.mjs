@@ -48,3 +48,23 @@ test('Eastern schedule prevents off-hours pulls and reserves one shared hourly s
  assert.equal((await budgetedOddsRefresh('test',get,()=>assert.fail('reserved outside window'),env,new Date('2026-11-04T20:00Z'))).code,'scheduled-odds');
  assert.equal((await budgetedOddsRefresh('test',get,reserve,env,new Date('2026-11-04T22:00Z'))).code,'scheduled-odds');
 });
+
+test('owner pulls can run off-hours within the shared budget and Eastern slate',async()=>{
+ const {budgetedOddsRefresh,easternSlateEnd}=await import('../lib/refresh.mjs');
+ const now=new Date('2026-11-04T20:00Z'),slateEnd=easternSlateEnd(now),reservations=[];
+ assert.equal(slateEnd.toISOString(),'2026-11-05T05:00:00.000Z');
+ assert.equal(easternSlateEnd(new Date('2026-10-31T23:00Z')).toISOString(),'2026-11-01T04:00:00.000Z');
+ const get=async url=>{
+  const u=new URL(url);
+  if(u.pathname.endsWith('/usage'))return {data:{rateLimits:{'per-month':{'current-entities':2490,'max-entities':2500}}}};
+  assert.equal(u.searchParams.get('startsAfter'),now.toISOString());
+  assert.equal(u.searchParams.get('startsBefore'),slateEnd.toISOString());
+  return {data:[event]};
+ };
+ const env={SPORTSGAMEODDS_REFRESH_HOURS_ET:'17,18,19,20,21,22',SPORTSGAMEODDS_DAILY_REFRESH_CAP:'8',SPORTSGAMEODDS_DAILY_REQUEST_CAP:'20'};
+ const reserve=async scope=>{reservations.push(scope);return true;};
+ assert.equal((await budgetedOddsRefresh('test',get,reserve,env,now,{manual:true,slateEnd})).status,'ok');
+ assert.deepEqual(reservations,['slot','manual','pull','request']);
+ const automatic=new Date('2026-11-04T22:00Z');
+ assert.equal((await budgetedOddsRefresh('test',get,reserve,env,automatic,{slateEnd})).code,'monthly-budget');
+});

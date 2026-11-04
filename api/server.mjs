@@ -25,7 +25,7 @@ const allowed=new Set(['live-data.json','evidence.json','evidence.auto.json','ev
 export default async function handler(req,res){try{
  const url=new URL(req.url,'http://local'),route=String(req.query?.route||url.searchParams.get('route')||url.pathname.replace(/^\/api\//,'')).replace(/^\//,'');
  if(route==='internal/refresh'){
-  const a=Buffer.from(String(req.headers.authorization||'')),b=Buffer.from('Bearer '+(process.env.CRON_SECRET||''));if(!process.env.CRON_SECRET||a.length!==b.length||!timingSafeEqual(a,b))throw new AppError(401,'Refresh authentication required.');if(req.method!=='GET')throw new AppError(405,'GET required.');return json(res,200,await runRefresh({maxEvents:80}));
+  const a=Buffer.from(String(req.headers.authorization||'')),b=Buffer.from('Bearer '+(process.env.CRON_SECRET||''));if(!process.env.CRON_SECRET||a.length!==b.length||!timingSafeEqual(a,b))throw new AppError(401,'Refresh authentication required.');if(req.method!=='GET')throw new AppError(405,'GET required.');return json(res,200,await runRefresh({maxEvents:80,manual:url.searchParams.get('trigger')==='owner'}));
  }
  if(route==='billing/webhook'){
   if(req.method!=='POST')throw new AppError(405,'POST required.');const event=verifyWebhook(await rawBody(req),req.headers['stripe-signature'],required('STRIPE_WEBHOOK_SECRET'));

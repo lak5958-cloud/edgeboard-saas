@@ -1,6 +1,8 @@
 # Automatic data collection and fantasy scoring
 
-The hosted collector is a bounded server job, independent of visitors. Supabase Cron calls the authenticated Vercel endpoint every ten minutes. It refreshes injuries and exact DraftKings and FanDuel quotes, checks all NBA/NFL team rosters and schedules hourly, and resumes a current-season final-box-score queue (80 events maximum per invocation). Source failures retain earlier files and their timestamps. Status is visible on the owner's Account page.
+The hosted collector is a bounded server job, independent of visitors. Supabase Cron calls the authenticated Vercel endpoint every ten minutes. It refreshes injuries, checks all NBA/NFL team rosters and schedules hourly, and resumes a current-season final-box-score queue (80 events maximum per invocation). Source failures retain earlier files and their timestamps. Status is visible on the owner's Account page.
+
+Odds refresh once per hour from 5 through 10 p.m. Eastern, when there are still known upcoming games or the slate is unknown. The worker queries NBA and NFL games starting before the next Eastern midnight. It retains the previous board if the feed fails or returns no quotes. The owner can request odds outside those hours. Owner and scheduled jobs share one slot per hour, eight pulls and twenty events requests per UTC day. Owner pulls are capped at two per UTC day. The worker checks SportsGameOdds account usage before fetching events and leaves 100 monthly objects available for owner pulls. The 75-minute quote freshness rule still applies.
 
 ## Owner setup
 

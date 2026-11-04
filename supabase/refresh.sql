@@ -31,12 +31,13 @@ create extension if not exists pg_net with schema extensions;
 create or replace function public.queue_refresh(bearer_token text default null) returns bigint
 language plpgsql security invoker set search_path='' as $$
 declare request_id bigint;
+ manual_request boolean := bearer_token is not null;
 begin
  if bearer_token is null then
   select decrypted_secret into bearer_token from vault.decrypted_secrets where name='edgeboard_refresh_token';
  end if;
  if bearer_token is null or length(bearer_token)<32 then raise exception 'Refresh credential is not configured'; end if;
- select net.http_get(url:='https://edgeboard-saas.vercel.app/api/internal/refresh',headers:=jsonb_build_object('Authorization','Bearer '||bearer_token),timeout_milliseconds:=240000) into request_id;
+ select net.http_get(url:='https://edgeboard-saas.vercel.app/api/internal/refresh'||case when manual_request then '?trigger=owner' else '' end,headers:=jsonb_build_object('Authorization','Bearer '||bearer_token),timeout_milliseconds:=240000) into request_id;
  return request_id;
 end $$;
 revoke all on function public.queue_refresh(text) from public,anon,authenticated;
