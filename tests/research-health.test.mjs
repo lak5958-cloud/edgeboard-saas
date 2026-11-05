@@ -59,3 +59,17 @@ test('coverage render escapes player input and empty performance never claims ac
  assert.match(html,/Unavailable/);
  assert.doesNotMatch(html,/model matched or beat/i);
 });
+
+test('injury identity comes from explicit ESPN athlete links and conflicting links are excluded',async()=>{
+ const {injuryRows}=await import('../lib/context.mjs');
+ const athlete={displayName:'Example Player',links:[{href:'https://www.espn.com/nfl/player/_/id/123/example-player'}],team:{id:'21'}};
+ const input={injuries:[{id:'21',injuries:[{status:'Out',date:'2026-11-05T16:00Z',athlete}]}]};
+ assert.equal(injuryRows(input,'NFL',now.toISOString())[0].athleteID,'123');
+ athlete.links.push({href:'https://www.espn.com/nfl/player/_/id/456/other-player'});
+ assert.equal(injuryRows(input,'NFL',now.toISOString()).length,0);
+});
+test('NBA defense coverage uses the current team-history archive',()=>{
+ const nba={...data,live:{games:[{league:'NBA',eventID:'x',home:'BOS',away:'NY',start:'2026-11-06T01:00Z'}],quotes:[]},schedule:{games:[]},rosters:[{...profile,league:'NBA',team:'BOS',currentTeamID:'2'}],context:{teamGames:[{league:'NBA',team:'NY',gameID:'earlier',date:'2026-11-01',seasonYear:2026,source:'https://example.com/box'}]}};
+ const r=researchHealth(nba,{league:'NBA',now});
+ assert.equal(r.rows[0].players[0].defenseGames,1);
+});
