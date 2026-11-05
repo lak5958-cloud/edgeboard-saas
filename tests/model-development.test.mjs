@@ -75,3 +75,13 @@ test('duplicate selections with conflicting settlements are excluded',()=>{
  assert.equal(lab.conflicts,1);
  assert.equal(lab.selections,223);
 });
+
+test('unchanged outcomes preserve earliest verification and source corrections reset the clock',async()=>{
+ const {verificationStamp}=await import('../lib/sports-collector.mjs');
+ const row={gameID:'x',date:'2026-11-04',seasonType:'regular',teamID:'t',value:5,source:'https://example.com/result',observedAt:'2026-11-05T01:00Z'};
+ const prior=verificationStamp(null,row);
+ const later=verificationStamp(prior,{...row,observedAt:'2026-11-05T03:00Z'});
+ assert.equal(later.firstVerifiedAt,row.observedAt);
+ const corrected=verificationStamp(later,{...row,value:6,observedAt:'2026-11-05T04:00Z'});
+ assert.equal(corrected.firstVerifiedAt,'2026-11-05T04:00Z');
+});
