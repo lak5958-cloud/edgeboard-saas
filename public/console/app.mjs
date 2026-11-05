@@ -1,3 +1,5 @@
+import {modelLabView,replayView} from './model-lab-view.mjs';
+import {replayCandidates} from './research-candidates.mjs';
 import {frozenAuditView} from './frozen-audit-view.mjs';
 import {readinessSnapshot} from './selection-readiness.mjs';
 import {freshnessView} from '../selection-freshness.mjs';
@@ -336,6 +338,29 @@ void fetchJson('/api/session').then(access=>{ownerAllowed=access.owner===true;$(
 
 const auditButton=$('loadFrozenAudit');if(auditButton)auditButton.onclick=async()=>{auditButton.disabled=true;$('frozenAudit').textContent='Checking retained pregame snapshots and matching verified outcomes…';try{const r=await requestJson('/api/frozen-audit?day='+encodeURIComponent($('frozenAuditDate').value)+'&scope='+encodeURIComponent($('frozenAuditScope').value),{timeoutMs:90000});$('frozenAudit').innerHTML=frozenAuditView(r);}catch(e){$('frozenAudit').textContent=e.message;}finally{auditButton.disabled=false;}};
 
-const compareButton=$('compareFrozenAudits');if(compareButton)compareButton.onclick=async()=>{compareButton.disabled=true;const region=$('frozenAuditComparison');region.textContent='Finding completed archived slates…';try{const scope=$('frozenAuditScope').value,{dates}=await requestJson('/api/frozen-audit-dates'),completed=dates.filter(d=>d.completed&&(scope==='games'?d.gameSnapshots>0:d.snapshots>0)).slice(-7),audits=[];for(let i=0;i<completed.length;i++){region.textContent=`Reading ${i+1} of ${completed.length} completed slates. Original forecasts remain unchanged…`;audits.push(await requestJson('/api/frozen-audit?day='+encodeURIComponent(completed[i].day)+'&scope='+encodeURIComponent(scope),{timeoutMs:90000}));}region.innerHTML=auditSummaryView(summarizeAudits(audits));}catch(e){region.textContent='Comparison could not finish: '+e.message+' No incomplete combined score is shown.';}finally{compareButton.disabled=false;}};
+const compareButton=$('compareFrozenAudits');if(compareButton)compareButton.onclick=async()=>{compareButton.disabled=true;const region=$('frozenAuditComparison');region.textContent='Finding completed archived slates…';try{const scope=$('frozenAuditScope').value,{dates}=await requestJson('/api/frozen-audit-dates'),completed=dates.filter(d=>d.completed&&(scope==='games'?d.gameSnapshots>0:d.snapshots>0)).slice(-7),audits=[];for(let i=0;i<completed.length;i++){region.textContent=`Reading ${i+1} of ${completed.length} completed slates. Original forecasts remain unchanged…`;audits.push(await requestJson('/api/frozen-audit?day='+encodeURIComponent(completed[i].day)+'&scope='+encodeURIComponent(scope),{timeoutMs:90000}));}const lab=await runModelLab(audits);region.innerHTML=auditSummaryView(summarizeAudits(audits))+modelLabView(audits,lab);}catch(e){region.textContent='Comparison could not finish: '+e.message+' No incomplete combined score is shown.';}finally{compareButton.disabled=false;}};
 
 const workloadButton=$('loadWorkloadAudit');if(workloadButton)workloadButton.onclick=async()=>{workloadButton.disabled=true;const region=$('workloadAudit');region.textContent='Checking sourced NFL workload history…';try{const r=await requestJson('/api/workload-audit',{timeoutMs:90000});region.innerHTML=`<p>${r.coverage.playersWithTypedWorkload} of ${r.coverage.players} current-team players have typed workload history.</p>${r.positions.map(g=>`<details><summary>${esc(g.position)} examples (${g.players.length})</summary>${g.players.map(p=>`<p><b>${esc(p.name)} · ${esc(p.team)}</b><br>${p.verifiedGames}/${p.currentTeamGames} recorded current-team games with ${esc(({passingAttempts:'passing attempts',rushingAttempts:'rushing attempts',targets:'receiving targets'})[p.kind]||p.kind)}. ${p.latest.map(x=>esc(x.date)+': '+esc(x.value)+(/^https:\/\//.test(x.source||'')?' <a href="'+esc(x.source)+'" target="_blank" rel="noopener noreferrer">Box score ↗</a>':'')).join('; ')||'No verified counts yet.'}</p>`).join('')}</details>`).join('')}<p>${esc(r.method)}</p>`;}catch(e){region.textContent=e.message;}finally{workloadButton.disabled=false;}};
+
+const replayButton=$('replayCandidates');if(replayButton)replayButton.onclick=async()=>{
+ const region=$('candidateReplay');
+ const q=activeQuotes.find(x=>String(x.line)===String(selectedLine));
+ if(!q||q.kind!=='Player Prop'){region.textContent='Select a quoted player prop first.';return;}
+ replayButton.disabled=true;region.textContent='Testing the selected threshold against earlier sourced games…';
+ try{
+  await new Promise(resolve=>setTimeout(resolve,0));
+  const a=analyzeSelection(q,{game:selectedGame(),records:recordsFor(q),context});
+  region.innerHTML=replayView(replayCandidates(q,a.sample,context));
+ }catch{region.textContent='The candidate replay could not complete. Reload the selected history and retry.';}
+ finally{replayButton.disabled=false;}
+};
+
+function runModelLab(audits){
+ return new Promise((resolve,reject)=>{
+  const worker=new Worker(new URL('./model-lab-worker.mjs',import.meta.url),{type:'module'});
+  const timer=setTimeout(()=>{worker.terminate();reject(Error('Model comparison timed out. Review fewer archived slates.'));},60000);
+  worker.onmessage=event=>{clearTimeout(timer);worker.terminate();event.data.error?reject(Error(event.data.error)):resolve(event.data.report);};
+  worker.onerror=()=>{clearTimeout(timer);worker.terminate();reject(Error('Model comparison could not complete.'));};
+  worker.postMessage(audits);
+ });
+}
