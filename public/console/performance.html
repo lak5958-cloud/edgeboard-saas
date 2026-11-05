@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Model performance | EdgeBoard</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="./performance.css"></head>
+<body>
+<header class="topbar"><a class="brand" href="/">EdgeBoard</a><nav aria-label="Research navigation"><a href="/research">Research workspace</a><a href="/picks">Daily picks</a><a href="/account">Account</a></nav></header>
+<main class="performance"><div class="pageTitle"><div class="eyebrow">Research Pro</div><h1>Data coverage &amp; model performance</h1><p>Check what is available before a game, then review how the frozen predictions performed.</p></div>
+<section id="access" class="card" hidden><h2>Sign in to Research Pro</h2><p>This dashboard uses the same access as the research workspace.</p><a class="button" href="/login?next=research">Sign in</a></section>
+<div id="dashboard" hidden>
+<div class="controls"><label>Sport<select id="sport"><option value="NBA">NBA basketball</option><option value="NFL">NFL football</option></select></label><label>Sportsbook<select id="book"><option value="draftkings">DraftKings</option><option value="fanduel">FanDuel</option></select></label><button id="coverageRefresh" type="button">Check saved coverage</button></div>
+<p class="fine">Odds are scheduled hourly from 5 through 10 p.m. Eastern, subject to quota and upcoming games. Coverage checks read saved data and do not request sportsbook odds.</p>
+<section aria-labelledby="coverageTitle"><h2 id="coverageTitle">Before the games</h2><p id="coverageStatus" role="status" aria-live="polite">Checking saved inputs…</p><div id="coverage"></div></section>
+<section class="performanceSection" aria-labelledby="resultsTitle"><h2 id="resultsTitle">After the games</h2><p>Review original pregame forecasts against verified outcomes. Player props and game lines have separate evaluations.</p><div class="controls"><label>Forecast group<select id="scope"><option value="cohort">Broader player sample</option><option value="shortlist">Leans and watchlist</option><option value="games">Game lines</option></select></label><button id="compare" type="button">Review latest completed slates</button></div><p id="performanceStatus" role="status" aria-live="polite">Select a group to review up to seven completed slates.</p><div id="results"></div></section>
+</div></main>
+<script type="module" src="./performance.mjs"></script></body></html>

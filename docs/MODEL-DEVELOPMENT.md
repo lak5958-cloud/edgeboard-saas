@@ -29,3 +29,15 @@ The broader player cohort retains a bounded deterministic hash sample of up to 4
 ## Still dependent on additional observations
 
 Confirmed lineups need an exact-event verified source. Complete snap/route feeds, official injury clearances, position-specific NFL defensive allowances, and dated pregame quarterback/weather effects need source integration. Feature coefficients cannot be validated from missing historical context. New frozen records are required for prospective workload, injury, defense and probability calibration comparisons. No model is automatically enabled because its in-sample fit looks good.
+
+## Coverage and performance dashboard
+
+Open /console/performance.html from Research. Existing Pro access protects the data APIs. Choose NBA/NFL and DraftKings/FanDuel. Coverage reads the retained schedule as well as the sportsbook board, so a scheduled game without a provider event is visible. Checks use saved inputs and repeat every minute while visible. They do not fetch new odds.
+
+Player rows distinguish quoted lines, verified roster recency, current-team history, measured workload, fresh matched injury reports and earlier defensive samples. NFL quarterback context shows observed passing-attempt leaders, including possible leader changes. This is not a confirmed starter projection.
+
+The NFL collector now rechecks current-season final games to save a complete offensive-player count and identity certificate per team. Opponent allowances require this complete set, reconciled scoring categories and consistent identities. Dropped rows or conflicting team sets are excluded. Prior saved boxes without the certificate are not treated as complete defensive totals. Current-season rechecks resume in bounded batches through the existing collector.
+
+Upcoming NFL event summaries are checked at most hourly, with 16 games per job and bounded concurrency, through the existing ESPN source. The collector verifies event identity, team IDs, start time and pregame status. Provider-supplied roof/weather descriptions are shown with source and collection time. Units are not guessed and missing weather remains unavailable. Weather and quarterback summaries are context only.
+
+The results section reads up to seven completed archived slates on request. It filters the exact sport, book and forecast group, reports scored versus pending outcomes, independent game counts, average estimated versus observed win rates, and paired same-book no-vig comparisons. Candidate fitting runs in a background worker. These are exploratory comparisons, without automatic promotion or a claimed betting edge.
