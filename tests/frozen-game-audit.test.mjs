@@ -19,3 +19,15 @@ test('missing, reversed and contradictory fixtures stay pending and postgame for
  assert.equal(audit([e],[...rows,{...rows[0],points:102}]).unsettled,1);
  assert.equal(audit([e],rows,start).excluded.notPregame,1);
 });
+
+test('the streaming audit preserves earliest valid snapshots even when reports arrive out of order',async()=>{
+ const {createFrozenGameAudit}=await import('../lib/frozen-game-audit.mjs');
+ const instance=createFrozenGameAudit({day:'2026-11-02',now});
+ const market=entry('Moneyline','home',null);
+ instance.add({report:{entries:[{...market,probability:.8}]},savedAt:'2026-11-02T22:00Z',path:'newer'});
+ instance.add({report:{entries:[market]},savedAt,path:'older'});
+ const result=instance.finish(rows);
+ assert.equal(result.scored,1);
+ assert.equal(result.results[0].probability,.6);
+ assert.equal(result.results[0].archivePath,'older');
+});

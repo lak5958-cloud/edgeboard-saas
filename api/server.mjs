@@ -1,5 +1,5 @@
 import {researchHealth} from '../lib/research-health.mjs';
-import {auditFrozenGames} from '../lib/frozen-game-audit.mjs';
+import {createFrozenGameAudit} from '../lib/frozen-game-audit.mjs';
 import {workloadAudit} from '../lib/workload-audit.mjs';
 import {auditDates} from '../lib/audit-summary.mjs';
 import outsideSeed from '../lib/outside-seed.json' with {type:'json'};
@@ -47,7 +47,7 @@ export default async function handler(req,res){try{
   const b=JSON.parse((await rawBody(req)).toString()),trade=analyzeTrade(await bundle(),b);
   required('AI_MODEL');const evidence=tradeEvidence(trade,{pro:access.pro});
   const result=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+required('OPENAI_API_KEY'),'Content-Type':'application/json'},body:JSON.stringify(briefPrompt(evidence))});
-  const selected=JSON.parse(result.choices?.[0]?.message?.content||'{}'),brief=groundedBrief(evidence,selected);return json(res,200,{brief,provider:'OpenAI',model:process.env.AI_MODEL,recommendation:trade.recommendation,method:'AI prioritizes existing evidence; the server renders verified facts. No AI probabilities or revised recommendations.',sources:[...new Set([...trade.give,...trade.receive].flatMap(p=>p.sources))]});
+  const selected=JSON.parse(result.choices?.[0]?.message?.content||'{}'),grounded=groundedBrief(evidence,selected,{withSources:true});return json(res,200,{...grounded,trade,provider:'OpenAI',model:process.env.AI_MODEL,recommendation:trade.recommendation,method:'AI prioritizes existing evidence; the server renders verified facts. No AI probabilities or revised recommendations.',sources:[...new Set([...trade.give,...trade.receive].flatMap(p=>p.sources))]});
  }
  if(route==='data-status'){const status=await snapshot('refresh-status.json',{});return json(res,200,{...status,oddsConfigured:!!process.env.SPORTSGAMEODDS_API_KEY,scheduledIntervalMinutes:10});}
  if(route==='game-markets'){const [report,live]=await Promise.all([snapshot('daily-game-markets.json',{}),snapshot('live-data.json',{})]);return json(res,200,publicGameMarkets(report,live,Object.fromEntries(url.searchParams)));}
@@ -72,15 +72,23 @@ export default async function handler(req,res){try{
   const day=url.searchParams.get('day')||'2026-11-02';if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day))||new Date(day).toISOString().slice(0,10)!==day)throw new AppError(400,'Choose a valid audit date.');const scope=url.searchParams.get('scope')||'shortlist',gameScope=scope==='games';
   if(!['shortlist','cohort','trade','games'].includes(scope))throw new AppError(400,'Choose a supported audit group.');
   const index=await snapshot('frozen-index.json',[]);let selected;try{selected=selectFrozenSources(index,!gameScope&&day==='2026-11-02'?frozenSources:[],day,{kind:gameScope?'games':'players'});}catch(e){throw new AppError(503,e.message);}
+  const gameAudit=gameScope?createFrozenGameAudit({day}):null;
   let expandedBytes=0;const reports=await readFrozenSources(selected,async source=>{
    const r=await fetch(required('SUPABASE_URL')+'/storage/v1/object/authenticated/edgeboard/'+source.path,{headers:supaHeaders(true),signal:AbortSignal.timeout(15000)});
    if(!r.ok)throw new AppError(503,'A retained pregame snapshot could not be read. No results were inferred.');
    const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');
-   const raw=gunzipSync(bytes,{maxOutputLength:20000000});expandedBytes+=raw.length;if(expandedBytes>40000000)throw new AppError(503,'Retained snapshots exceed the review memory limit. No partial score is shown.');return JSON.parse(raw.toString());
+   const raw=gunzipSync(bytes,{maxOutputLength:20000000});
+   if(gameAudit){
+    gameAudit.add({...source,report:JSON.parse(raw.toString())});
+    return null;
+   }
+   expandedBytes+=raw.length;
+   if(expandedBytes>40000000)throw new AppError(503,'Retained snapshots exceed the review memory limit. No partial score is shown.');
+   return JSON.parse(raw.toString());
   });
   if(gameScope){
    const teamHistory=await snapshot('team-history.json',{});
-   return json(res,200,{...auditFrozenGames(reports,teamHistory.games||[],{day}),coverage:`${selected.length} retained game-market snapshots. This group is evaluated separately from player props.`});
+   return json(res,200,{...gameAudit.finish(teamHistory.games||[]),coverage:`${selected.length} retained game-market snapshots. This group is evaluated separately from player props.`});
   }
   const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day,scope}),coverage:`All ${selected.length} indexed or legacy retained snapshots for this date were read, with duplicate paths removed. No hourly sampling. ${scope==='trade'?'NBA trade trial captures exact half-point prop forecasts and dated roster evidence.':scope==='cohort'?'Evaluation cohort includes supported standard and alternate props captured before shortlist filtering.':'This view covers published shortlists and watchlists.'} Results remain exploratory, not a calibration certificate or verified historical ROI.`});
  }
