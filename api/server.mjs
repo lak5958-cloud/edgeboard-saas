@@ -77,7 +77,9 @@ export default async function handler(req,res){try{
    const r=await fetch(required('SUPABASE_URL')+'/storage/v1/object/authenticated/edgeboard/'+source.path,{headers:supaHeaders(true),signal:AbortSignal.timeout(15000)});
    if(!r.ok)throw new AppError(503,'A retained pregame snapshot could not be read. No results were inferred.');
    const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');
-   const raw=gunzipSync(bytes,{maxOutputLength:20000000});
+   let raw;
+   try{raw=gunzipSync(bytes,{maxOutputLength:gameScope?64000000:20000000});}
+   catch{throw new AppError(503,'A retained snapshot could not be expanded within the audit limit. No partial score is shown.');}
    if(gameAudit){
     gameAudit.add({...source,report:JSON.parse(raw.toString())});
     return null;
@@ -85,7 +87,7 @@ export default async function handler(req,res){try{
    expandedBytes+=raw.length;
    if(expandedBytes>40000000)throw new AppError(503,'Retained snapshots exceed the review memory limit. No partial score is shown.');
    return JSON.parse(raw.toString());
-  });
+  },{concurrency:gameScope?2:4});
   if(gameScope){
    const teamHistory=await snapshot('team-history.json',{});
    return json(res,200,{...gameAudit.finish(teamHistory.games||[]),coverage:`${selected.length} retained game-market snapshots. This group is evaluated separately from player props.`});

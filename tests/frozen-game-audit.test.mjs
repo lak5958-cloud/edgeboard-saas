@@ -31,3 +31,12 @@ test('the streaming audit preserves earliest valid snapshots even when reports a
  assert.equal(result.results[0].probability,.6);
  assert.equal(result.results[0].archivePath,'older');
 });
+
+test('a final on the current UTC date can settle an earlier Eastern slate',()=>{
+ const market=entry('Moneyline','home',null);
+ const checkedAt=new Date('2026-11-03T04:00Z');
+ const report={report:{entries:[market]},savedAt,path:'fixture'};
+ assert.equal(auditFrozenGames([report],rows,{day:'2026-11-02',now:checkedAt}).scored,1);
+ const future=rows.map(row=>({...row,observedAt:'2026-11-03T05:00Z'}));
+ assert.equal(auditFrozenGames([report],future,{day:'2026-11-02',now:checkedAt}).unsettled,1);
+});
