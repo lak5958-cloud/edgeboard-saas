@@ -4,7 +4,7 @@ import {replaceView,createRefreshTask,isEditing} from './refresh-view.mjs';
 import {gameMarketsView} from './game-markets-view.mjs';
 import {pickMarketsView,marketPlayerCards} from './pick-markets-view.mjs';
 import {picksResults} from './picks-view.mjs';
-import {avatar,tradeResult,briefView} from './trade-view.mjs';
+import {avatar,tradeResult,briefView,forecastHistoryView} from './trade-view.mjs';
 import {pageView} from './views.mjs';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let sportsbook='draftkings';let league='NFL',players=[],give=[],receive=[],access={user:null,pro:false},currentTrade=null,revision=0;
 const sources=urls=>[...new Set(urls||[])].filter(u=>{try{return new URL(u).protocol==='https:'}catch{return false}}).slice(0,8).map((u,i)=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">Source ${i+1} ↗</a>`).join('');
@@ -14,7 +14,7 @@ function bindLeagues(){document.querySelectorAll('[data-league]').forEach(b=>b.o
 function render(){
  const path=location.pathname;$('#app').innerHTML=pageView(path,league,access);
  document.querySelectorAll('.topbar nav a').forEach(a=>{const active=new URL(a.href).pathname===path;a.classList.toggle('current',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
- bindLeagues();if($('#accessCodeForm'))bindAccessCode();if($('#trade'))bindTool();if($('#daily')){const book=$('#sportsbook');book.value=sportsbook;$('#checkSlate').onclick=()=>void checkSlate();$('#slateReadiness').ontoggle=()=>{if($('#slateReadiness')?.open)void checkSlate();};book.onchange=()=>{sportsbook=book.value;if($('#slateReadiness')?.open)void checkSlate();marketFilters.playerKey='';marketFilters.stat='';marketFilters.side='';marketFilters.limit=25;gameFilters.cursor='0';void loadPicks(true);void loadMarketCoverage();void loadGameMarkets();};void loadPicks();void feedStatus();void loadMarketCoverage();void loadGameMarkets();$('#shortlistView').onclick=()=>setDailyView('shortlist');$('#marketView').onclick=()=>setDailyView('markets');$('#gameView').onclick=()=>setDailyView('games');setDailyView(dailyView);}if($('#ownerRefresh')){$('#ownerRefresh').onclick=ownerRefresh;void ownerStatus();void loadBillingReview();}if($('#loadPicks'))$('#loadPicks').onclick=()=>{void loadPicks();void loadMarketCoverage();void loadGameMarkets();};if($('#checkout')){ $('#checkout').onclick=()=>billing('checkout');void loadBilling();}if($('#portal'))$('#portal').onclick=()=>billing('portal');if($('#logout'))$('#logout').onclick=async()=>{try{await api('auth/logout',{});location.href='/'}catch(e){toast(e.message)}};if($('#authForm'))bindAuth();
+ bindLeagues();if($('#accessCodeForm'))bindAccessCode();if($('#trade')){bindTool();$('#reviewForecasts').onclick=reviewForecasts;}if($('#daily')){const book=$('#sportsbook');book.value=sportsbook;$('#checkSlate').onclick=()=>void checkSlate();$('#slateReadiness').ontoggle=()=>{if($('#slateReadiness')?.open)void checkSlate();};book.onchange=()=>{sportsbook=book.value;if($('#slateReadiness')?.open)void checkSlate();marketFilters.playerKey='';marketFilters.stat='';marketFilters.side='';marketFilters.limit=25;gameFilters.cursor='0';void loadPicks(true);void loadMarketCoverage();void loadGameMarkets();};void loadPicks();void feedStatus();void loadMarketCoverage();void loadGameMarkets();$('#shortlistView').onclick=()=>setDailyView('shortlist');$('#marketView').onclick=()=>setDailyView('markets');$('#gameView').onclick=()=>setDailyView('games');setDailyView(dailyView);}if($('#ownerRefresh')){$('#ownerRefresh').onclick=ownerRefresh;void ownerStatus();void loadBillingReview();}if($('#loadPicks'))$('#loadPicks').onclick=()=>{void loadPicks();void loadMarketCoverage();void loadGameMarkets();};if($('#checkout')){ $('#checkout').onclick=()=>billing('checkout');void loadBilling();}if($('#portal'))$('#portal').onclick=()=>billing('portal');if($('#logout'))$('#logout').onclick=async()=>{try{await api('auth/logout',{});location.href='/'}catch(e){toast(e.message)}};if($('#authForm'))bindAuth();
 }
 function invalidateTrade(){revision++;currentTrade=null;if($('#tradeResult'))$('#tradeResult').innerHTML='';}
 function bindPortraits(){document.querySelectorAll('.playerAvatar img').forEach(img=>img.addEventListener('error',()=>img.remove(),{once:true}));}
@@ -24,7 +24,38 @@ async function runTrade(ai){if(!give.length||!receive.length)return toast('Add a
  $('#tradeResult').innerHTML=tradeResult(currentTrade);
  bindPortraits();
  $('#aiBrief').onclick=()=>runTrade(true);
+ if($('#saveForecast'))$('#saveForecast').onclick=()=>saveForecast(input,currentTrade.forecastKey);
  if(ai){const output=$('#aiOutput');output.innerHTML=briefView(r);output.scrollIntoView({block:'nearest'});}}catch(e){toast(e.message)}finally{button.disabled=false}}
+async function saveForecast(input, expectedKey) {
+ const button=$('#saveForecast'),status=$('#forecastSaveStatus');
+ button.disabled=true;
+ status.textContent='Saving the displayed scoring estimates…';
+ try {
+  const saved=await api('fantasy/forecasts',{input,expectedKey});
+  status.textContent='Forecast saved on '+new Date(saved.capturedAt).toLocaleString()+'.';
+  if(status.isConnected)void reviewForecasts();
+ } catch(error) {
+  status.textContent=error.message;
+  button.disabled=false;
+ }
+}
+
+async function reviewForecasts() {
+ const button=$('#reviewForecasts'),status=$('#forecastHistoryStatus'),results=$('#forecastHistory');
+ if(!button||button.disabled)return;
+ button.disabled=true;
+ status.textContent='Checking verified appearances…';
+ try {
+  const {forecasts}=await api('fantasy/forecasts');
+  results.innerHTML=forecastHistoryView(forecasts);
+  status.textContent=forecasts.length?'Showing up to 30 recent forecasts.':'';
+ } catch(error) {
+  status.textContent=error.message;
+ } finally {
+  button.disabled=false;
+ }
+}
+
 let pickRequest=0,marketRequest=0,dailyView='shortlist',marketFilters={eventID:'',playerKey:'',stat:'',side:'',search:'',limit:25},marketData=null,gameRequest=0,gameFilters={eventID:'',kind:'Moneyline',cursor:'0'};
 async function loadPicks(force=false,quiet=false){const b=$('#loadPicks');if(!b||b.disabled&&!force)return;const id=++pickRequest;b.disabled=true;const requestLeague=league,requestBook=sportsbook;if(!quiet)$('#dailyResults').textContent='Checking the latest prices and player history…';try{const r=await api('picks?league='+requestLeague+'&book='+requestBook);if(id!==pickRequest||requestLeague!==league||requestBook!==sportsbook||!$('#dailyResults'))return;$('#dailyResults').className='';replaceView($('#dailyResults'),picksResults(r),{preserve:quiet});bindPortraits();}catch(e){if(id===pickRequest&&$('#dailyResults')){if(quiet)showUpdateError(e);else $('#dailyResults').textContent=e.message;}}finally{if(id===pickRequest)b.disabled=false}}
 function setDailyView(view){const changed=dailyView!==view;dailyView=view;$('#dailyShortlist').hidden=view!=='shortlist';$('#dailyMarketCoverage').hidden=view!=='markets';$('#dailyGameCoverage').hidden=view!=='games';for(const [id,name] of [['shortlistView','shortlist'],['marketView','markets'],['gameView','games']]){$('#'+id).classList.toggle('active',view===name);$('#'+id).setAttribute('aria-pressed',String(view===name));}if(changed){if(view==='shortlist')void loadPicks();if(view==='markets')void loadMarketCoverage();if(view==='games')void loadGameMarkets();}}

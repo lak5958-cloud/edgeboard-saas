@@ -28,6 +28,7 @@ export function tradeResult(r) {
  ${a.conditions.length ? `<section class="adviceBlock"><h3>What would change the decision</h3><ul>${a.conditions.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
  <div class="resultGrid">${[['You send',r.give],['You receive',r.receive]].map(([label,ps])=>`<section><h3>${label}</h3>${ps.map(playerCard).join('')}</section>`).join('')}</div>
  <p class="fine">*Per-game scoring uses the verified appearances listed above and your chosen scoring settings.</p>
+ ${r.forecastKey ? '<button class="subtle" id="saveForecast">Save scoring forecast</button><p class="fine">Track each player’s next three verified appearances within 45 days.</p><p id="forecastSaveStatus" role="status"></p>' : ''}
  <button class="subtle" id="aiBrief">Explain this trade in more detail</button>
  <p class="fine">Sign in for the evidence review. Pro adds named roster scenarios, scoring drivers and decision thresholds.</p>
  <div id="aiOutput" aria-live="polite"></div></div>`;
@@ -37,5 +38,21 @@ export function briefView(r) {
  const labels={summary:'Scoring and recommendation',roster_fit:'Lineup impact',uncertainty:'What could shift the result',scenarios:'Other ways to value the deal',next_steps:'What to verify before trading'};
  return `<h3>Your trade, explained</h3>${Object.entries(r.brief).map(([key,value])=>
   `<section class="adviceBlock"><h4>${esc(labels[key]||key)}</h4><p>${esc(value)}</p>${r.briefSources?.[key]?.length ? `<div class="sources">${links(r.briefSources[key])}</div>` : ''}</section>`).join('')}
- <p class="fine">AI prioritizes evidence calculated and sourced by EdgeBoard.</p>`;
+ <p class="fine">${r.provider==='EdgeBoard'?'EdgeBoard selected the verified evidence after the AI response failed validation.':'AI prioritizes evidence calculated and sourced by EdgeBoard.'}</p>`;
+}
+
+
+export function forecastHistoryView(forecasts) {
+ if (!forecasts.length) return '<p>No saved scoring forecasts yet.</p>';
+ const points = value => Number.isFinite(value) ? value.toFixed(1) : '—';
+ const when = value => new Date(value).toLocaleDateString('en-US', {timeZone:'America/New_York',month:'short',day:'numeric',year:'numeric'});
+ return forecasts.map(forecast => `<details class="adviceBlock"><summary>${esc(when(forecast.capturedAt))} · ${esc(forecast.league)} · ${esc(forecast.players.map(player=>player.name).join(', '))}</summary>
+ <p class="fine">${forecast.league==='NFL'?esc(({ppr:'PPR',half:'Half PPR',standard:'Standard'})[forecast.format]):'NBA fantasy points'}. Errors are averages across verified appearances. Lower error is better.</p>
+ <div class="tradeScenarioTable"><table><thead><tr><th>Player</th><th>Saved points</th><th>Verified results</th><th>Average error</th></tr></thead><tbody>
+ ${forecast.players.map(player => `<tr><th scope="row">${esc(player.name)}<br><small>${esc(player.side==='send'?'Send':'Receive')} · ${esc(player.team)}</small></th>
+ <td>${points(player.baseline)} baseline<br>${points(player.recentBlend)} recent-weighted candidate</td>
+ <td>${player.games.length}/3 · ${esc(player.status)}
+ ${player.games.map(game => `<br>${esc(when(game.start))} · ${points(game.actual)} points${game.team&&game.team!==player.team?' · '+esc(game.team):''} ${links([game.source])}`).join('')}</td>
+ <td>${points(player.baselineError)} baseline<br>${points(player.recentBlendError)} candidate</td></tr>`).join('')}
+ </tbody></table></div></details>`).join('');
 }
