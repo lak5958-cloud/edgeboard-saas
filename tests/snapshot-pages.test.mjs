@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {gzipSync} from 'node:zlib';import {createHash} from 'node:crypto';import {decodeSnapshot,pageRows,manifestEntry} from '../lib/snapshot-pages.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {gzipSync} from 'node:zlib';import {createHash,randomUUID} from 'node:crypto';import {decodeSnapshot,pageRows,manifestEntry} from '../lib/snapshot-pages.mjs';
 const data=[{player:'Synthetic Example',value:4}],raw=Buffer.from(JSON.stringify(data)),gzip=gzipSync(raw),info={path:'imports/synthetic/evidence.players.json.gz',bytes:gzip.length,rawBytes:raw.length,sha256:createHash('sha256').update(gzip).digest('hex')};
 test('compressed private snapshots round trip without changing values',()=>assert.deepEqual(decodeSnapshot(gzip,info),data));
 test('corrupt compressed bytes and mismatched expanded lengths fail closed',()=>{assert.throws(()=>decodeSnapshot(Buffer.concat([gzip,Buffer.from('x')]),info),/checksum/);assert.throws(()=>decodeSnapshot(gzip,{...info,rawBytes:1}),/length/)});
@@ -6,11 +6,11 @@ test('pagination respects UTF-8 byte bounds and retains every record exactly onc
 test('invalid cursors and individually oversized records cannot silently truncate data',()=>{for(const c of [-1,'x',.5,2])assert.throws(()=>pageRows([{}],c),/cursor/);assert.throws(()=>pageRows([{x:'a'.repeat(1000)}],0,{byteBudget:20}),/limit/)});
 test('manifest paths cannot escape the immutable private import prefix',()=>{assert.deepEqual(manifestEntry({files:{a:info}},'a'),info);assert.equal(manifestEntry({files:{}},'absent'),null);for(const path of ['../config/key','https://foreign.example/x','imports/a/../../secret'])assert.throws(()=>manifestEntry({files:{a:{...info,path}}},'a'),/manifest/)});
 test('concurrent snapshot requests share manifest/object reads and verify integrity',async()=>{
- const {snapshot}=await import('../lib/cloud.mjs'),original=globalThis.fetch,env={...process.env};process.env.SUPABASE_URL='https://synthetic.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic-service';let calls=0;
+ const {snapshot}=await import('../lib/cloud.mjs'),original=globalThis.fetch,env={...process.env};process.env.SUPABASE_URL=`https://synthetic-${randomUUID()}.supabase.co`;process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic-service';let calls=0;
  globalThis.fetch=async url=>{calls++;if(new URL(url).pathname.endsWith('manifest.json'))assert(new URL(url).searchParams.has('v'));return new URL(url).pathname.endsWith('manifest.json')?new Response(JSON.stringify({files:{'test.json':info}})):new Response(gzip)};
  try{assert.deepEqual(await Promise.all([snapshot('test.json',null),snapshot('test.json',null)]),[data,data]);assert.equal(calls,2)}finally{globalThis.fetch=original;for(const k of ['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY']){if(env[k]===undefined)delete process.env[k];else process.env[k]=env[k]}}
 });
 test('missing storage objects fall back, but storage permission failures remain errors',async()=>{
- const {snapshot}=await import('../lib/cloud.mjs'),original=globalThis.fetch,prior={...process.env};process.env.SUPABASE_URL='https://synthetic.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic-service';
+ const {snapshot}=await import('../lib/cloud.mjs'),original=globalThis.fetch,prior={...process.env};process.env.SUPABASE_URL=`https://synthetic-${randomUUID()}.supabase.co`;process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic-service';
  try{globalThis.fetch=async()=>new Response(JSON.stringify({statusCode:'404',error:'not_found'}),{status:400});assert.deepEqual(await snapshot('absent-test.json',[]),[]);globalThis.fetch=async()=>new Response('Unauthorized',{status:403});await assert.rejects(()=>snapshot('denied-test.json',[]),/could not be read/)}finally{globalThis.fetch=original;for(const k of ['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY']){if(prior[k]===undefined)delete process.env[k];else process.env[k]=prior[k]}}
 });

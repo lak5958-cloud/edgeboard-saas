@@ -8,7 +8,7 @@ import {auditFrozen} from '../lib/frozen-audit.mjs';
 import {selectFrozenSources,readFrozenSources} from '../lib/frozen-review.mjs';
 import {frozenSources} from '../lib/frozen-sources.mjs';
 import {gunzipSync} from 'node:zlib';
-import {supaHeaders} from '../lib/cloud.mjs';
+import {readSnapshotObject} from '../lib/cloud.mjs';
 import {redeemAccessCode} from '../lib/access-code.mjs';
 import {publicGameMarkets} from '../lib/game-markets.mjs';
 import {tradeEvidence,groundedBrief,briefPrompt,defaultBriefSelection} from '../lib/ai-evidence.mjs';
@@ -41,11 +41,11 @@ export default async function handler(req,res){try{
  if(['auth/login','auth/signup'].includes(route)){if(req.method!=='POST')throw new AppError(405,'POST required.');await budget(req,'auth',20);const b=JSON.parse((await rawBody(req)).toString());return json(res,200,await login(res,b.email,b.password,route.endsWith('signup')));}
  if(route==='auth/logout'){if(req.method!=='POST')throw new AppError(405,'POST required.');const user=await userFor(req,res);sessionCookies(res,null);return json(res,200,{signedOut:true});}
  if(route==='headshot'){const league=String(url.searchParams.get('league')||'').toLowerCase(),id=url.searchParams.get('id')||'';if(!['nba','nfl'].includes(league)||!/^\d{1,12}$/.test(id))throw new AppError(400,'Invalid player image.');const image=await fetch(`https://a.espncdn.com/i/headshots/${league}/players/full/${id}.png`,{signal:AbortSignal.timeout(10000)});if(!image.ok||!image.headers.get('content-type')?.startsWith('image/png'))throw new AppError(404,'Player image unavailable.');const bytes=Buffer.from(await image.arrayBuffer());if(bytes.length>1500000)throw new AppError(404,'Player image unavailable.');res.statusCode=200;res.setHeader('Content-Type','image/png');res.setHeader('Cache-Control','public, max-age=86400, s-maxage=604800');res.setHeader('X-Content-Type-Options','nosniff');return res.end(bytes);}
- if(route==='players'){const league=url.searchParams.get('league');if(!['NBA','NFL'].includes(league))throw new AppError(400,'Choose NBA or NFL.');const data=await bundle();return json(res,200,{players:playerList(data,league),snapshotAt:data.live.generatedAt||null});}
- if(route==='fantasy/analyze'){if(req.method!=='POST')throw new AppError(405,'POST required.');await budget(req,'fantasy');const input=JSON.parse((await rawBody(req)).toString());const trade=analyzeTrade(await bundle(),input);return json(res,200,{...trade,forecastKey:prepareFantasyForecast(trade)?.key||null});}
+ if(route==='players'){const league=url.searchParams.get('league');if(!['NBA','NFL'].includes(league))throw new AppError(400,'Choose NBA or NFL.');const data=await bundle({rostersOnly:true});return json(res,200,{players:playerList(data,league),snapshotAt:data.live.generatedAt||null});}
+ if(route==='fantasy/analyze'){if(req.method!=='POST')throw new AppError(405,'POST required.');await budget(req,'fantasy');const input=JSON.parse((await rawBody(req)).toString());const trade=analyzeTrade(await bundle({fantasyOnly:true}),input);return json(res,200,{...trade,forecastKey:prepareFantasyForecast(trade)?.key||null});}
  if(route==='ai/brief'){
   if(req.method!=='POST')throw new AppError(405,'POST required.');const access=await accessFor(req,res);if(!access.user)throw new AppError(401,'Sign in for an AI trade brief.');await budget(req,'ai-'+access.user.id,access.pro?20:3);
-  const b=JSON.parse((await rawBody(req)).toString()),trade=analyzeTrade(await bundle(),b);
+  const b=JSON.parse((await rawBody(req)).toString()),trade=analyzeTrade(await bundle({fantasyOnly:true}),b);
   required('AI_MODEL');const evidence=tradeEvidence(trade,{pro:access.pro});
   const result=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+required('OPENAI_API_KEY'),'Content-Type':'application/json'},body:JSON.stringify(briefPrompt(evidence))});
   let grounded,provider='OpenAI';
@@ -81,7 +81,7 @@ export default async function handler(req,res){try{
    if(!input||typeof expectedKey!=='string'||!/^[0-9a-f]{64}$/.test(expectedKey))throw new AppError(400,'Analyze the trade before saving a forecast.');
    const existing=await sb(table+'?user_id=eq.'+user+'&forecast_key=eq.'+expectedKey+'&select=captured_at');
    if(existing.length)return json(res,200,{saved:true,capturedAt:existing[0].captured_at});
-   const trade=analyzeTrade(await bundle(),input),prepared=prepareFantasyForecast(trade);
+   const trade=analyzeTrade(await bundle({fantasyOnly:true}),input),prepared=prepareFantasyForecast(trade);
    if(!prepared||prepared.key!==expectedKey)throw new AppError(409,'The scoring evidence changed. Analyze the trade again before saving.');
    await sb(table+'?on_conflict=user_id,forecast_key',{method:'POST',
     headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},
@@ -96,8 +96,8 @@ export default async function handler(req,res){try{
  if(route==='billing/review'){if(!access.owner)throw new AppError(403,'Owner access required.');if(req.method==='POST'){const b=JSON.parse((await rawBody(req)).toString());if(!/^evt_[A-Za-z0-9]+$/.test(b.id||''))throw new AppError(400,'Invalid billing event.');await sb('/rest/v1/billing_events?id=eq.'+encodeURIComponent(b.id),{method:'PATCH',body:JSON.stringify({review_required:false,result:'Owner marked reviewed. No automatic monetary action.'})});return json(res,200,{reviewed:true});}return json(res,200,{events:await sb('/rest/v1/billing_events?review_required=eq.true&order=created_at.desc&limit=20')});}
  if(route==='billing/checkout'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in before checkout.');if(access.pro)throw new AppError(409,'You already have Pro access. No new subscription is needed.');await budget(req,'checkout',10);const s=await checkout(access.user);return json(res,200,{url:s.url});}
  if(route==='billing/portal'){if(req.method!=='POST')throw new AppError(405,'POST required.');if(!access.user)throw new AppError(401,'Sign in first.');const rows=await sb('/rest/v1/entitlements?user_id=eq.'+encodeURIComponent(access.user.id)+'&kind=eq.subscription&select=customer_id');if(!rows[0]?.customer_id)throw new AppError(400,'No billing account found.');const p=await stripe('billing_portal/sessions',{customer:rows[0].customer_id,return_url:required('APP_URL')+'/account',...(process.env.STRIPE_PORTAL_CONFIGURATION_ID?{configuration:process.env.STRIPE_PORTAL_CONFIGURATION_ID}:{})});return json(res,200,{url:p.url});}
- if(route==='research-health'){requirePro(access);const league=url.searchParams.get('league')||'NFL',book=url.searchParams.get('book')||'draftkings';if(!['NBA','NFL'].includes(league)||!['draftkings','fanduel'].includes(book))throw new AppError(400,'Choose a supported sport and sportsbook.');return json(res,200,researchHealth(await bundle({includeHistory:true}),{league,book}));}
- if(route==='workload-audit'){requirePro(access);const data=await bundle({includeHistory:true});return json(res,200,workloadAudit(data.records,data.rosters));}
+ if(route==='research-health'){requirePro(access);const league=url.searchParams.get('league')||'NFL',book=url.searchParams.get('book')||'draftkings';if(!['NBA','NFL'].includes(league)||!['draftkings','fanduel'].includes(book))throw new AppError(400,'Choose a supported sport and sportsbook.');return json(res,200,researchHealth(await bundle(),{league,book}));}
+ if(route==='workload-audit'){requirePro(access);const data=await bundle({workloadOnly:true});return json(res,200,workloadAudit(data.records,data.rosters));}
  if(route==='frozen-audit-dates'){requirePro(access);return json(res,200,{dates:auditDates(await snapshot('frozen-index.json',[]))});}
  if(route==='frozen-audit'){
   requirePro(access);if(req.method!=='GET')throw new AppError(405,'GET required.');
@@ -106,9 +106,7 @@ export default async function handler(req,res){try{
   const index=await snapshot('frozen-index.json',[]);let selected;try{selected=selectFrozenSources(index,!gameScope&&day==='2026-11-02'?frozenSources:[],day,{kind:gameScope?'games':'players'});}catch(e){throw new AppError(503,e.message);}
   const gameAudit=gameScope?createFrozenGameAudit({day}):null;
   let expandedBytes=0;const reports=await readFrozenSources(selected,async source=>{
-   const r=await fetch(required('SUPABASE_URL')+'/storage/v1/object/authenticated/edgeboard/'+source.path,{headers:supaHeaders(true),signal:AbortSignal.timeout(15000)});
-   if(!r.ok)throw new AppError(503,'A retained pregame snapshot could not be read. No results were inferred.');
-   const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');
+   const bytes=await readSnapshotObject(source.path,{timeout:15000});if(!bytes)throw new AppError(503,'A retained pregame snapshot could not be read. No results were inferred.');if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');
    let raw;
    try{raw=gunzipSync(bytes,{maxOutputLength:gameScope?64000000:20000000});}
    catch{throw new AppError(503,'A retained snapshot could not be expanded within the audit limit. No partial score is shown.');}
