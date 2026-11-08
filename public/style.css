@@ -20,3 +20,5 @@
 
 .tradeScenarioTable { overflow-x: auto; }
 .tradeScenarioTable table { min-width: 460px; }
+
+.pickSortControls{display:grid;grid-template-columns:1.25fr 1fr 1.25fr;gap:16px;padding:20px;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin:20px 0 10px}.pickSortControls label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:650;color:var(--muted)}.pickSortControls select{width:100%;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font-weight:500;font-size:14px}.pickSortHelp{max-width:850px}.pickSortSummary{padding:12px 0;font-size:14px}.pickBlockers{border:1px solid #e7d7b8;background:#faf6ed;border-radius:6px;padding:14px 16px;margin:14px 0 8px;color:#775021;font-size:13px}.pickBlockers ul{padding-left:18px;margin:8px 0}.pickBlockers p{font-size:12px;margin:8px 0 0;color:#775021}.pickTop .pill{max-width:90%;font-size:11px}@media(max-width:680px){.pickSortControls{grid-template-columns:1fr;padding:16px;gap:12px}}
