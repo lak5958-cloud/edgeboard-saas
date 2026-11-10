@@ -14,18 +14,136 @@ function bindLeagues(){document.querySelectorAll('[data-league]').forEach(b=>b.o
 function render(){
  const path=location.pathname;$('#app').innerHTML=pageView(path,league,access);
  document.querySelectorAll('.topbar nav a').forEach(a=>{const active=new URL(a.href).pathname===path;a.classList.toggle('current',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
- bindLeagues();if($('#accessCodeForm'))bindAccessCode();if($('#trade')){bindTool();$('#reviewForecasts').onclick=reviewForecasts;}if($('#daily')){bindPickOrdering();const book=$('#sportsbook');book.value=sportsbook;$('#checkSlate').onclick=()=>void checkSlate();$('#slateReadiness').ontoggle=()=>{if($('#slateReadiness')?.open)void checkSlate();};book.onchange=()=>{sportsbook=book.value;if($('#slateReadiness')?.open)void checkSlate();marketFilters.playerKey='';marketFilters.stat='';marketFilters.side='';marketFilters.limit=25;gameFilters.cursor='0';void loadPicks(true);void loadMarketCoverage();void loadGameMarkets();};void loadPicks();void feedStatus();void loadMarketCoverage();void loadGameMarkets();$('#shortlistView').onclick=()=>setDailyView('shortlist');$('#marketView').onclick=()=>setDailyView('markets');$('#gameView').onclick=()=>setDailyView('games');setDailyView(dailyView);}if($('#ownerRefresh')){$('#ownerRefresh').onclick=ownerRefresh;void ownerStatus();void loadBillingReview();}if($('#loadPicks'))$('#loadPicks').onclick=()=>{void loadPicks();void loadMarketCoverage();void loadGameMarkets();};if($('#checkout')){ $('#checkout').onclick=()=>billing('checkout');void loadBilling();}if($('#portal'))$('#portal').onclick=()=>billing('portal');if($('#logout'))$('#logout').onclick=async()=>{try{await api('auth/logout',{});location.href='/'}catch(e){toast(e.message)}};if($('#authForm'))bindAuth();
+ bindLeagues();if($('#accessCodeForm'))bindAccessCode();if($('#trade')){bindTool();$('#reviewForecasts').onclick=reviewForecasts;}if($('#daily')){bindPickOrdering();const book=$('#sportsbook');book.value=sportsbook;$('#checkSlate').onclick=()=>void checkSlate();$('#slateReadiness').ontoggle=()=>{if($('#slateReadiness')?.open)void checkSlate();};book.onchange=()=>{sportsbook=book.value;if($('#slateReadiness')?.open)void checkSlate();marketFilters.playerKey='';marketFilters.stat='';marketFilters.side='';marketFilters.limit=25;gameFilters.cursor='0';void loadDailyView();};void feedStatus();$('#shortlistView').onclick=()=>setDailyView('shortlist');$('#marketView').onclick=()=>setDailyView('markets');$('#gameView').onclick=()=>setDailyView('games');setDailyView(dailyView,true);$('#dailyResults').onclick=event=>{const button=event.target.closest('[data-open-pick-view]');if(button){setDailyView(button.dataset.openPickView);$('#marketView').focus();}};}if($('#ownerRefresh')){$('#ownerRefresh').onclick=ownerRefresh;void ownerStatus();void loadBillingReview();}if($('#loadPicks'))$('#loadPicks').onclick=()=>void loadDailyView();if($('#checkout')){ $('#checkout').onclick=()=>billing('checkout');void loadBilling();}if($('#portal'))$('#portal').onclick=()=>billing('portal');if($('#logout'))$('#logout').onclick=async()=>{try{await api('auth/logout',{});location.href='/'}catch(e){toast(e.message)}};if($('#authForm'))bindAuth();
 }
 function invalidateTrade(){revision++;currentTrade=null;if($('#tradeResult'))$('#tradeResult').innerHTML='';}
 function bindPortraits(){document.querySelectorAll('.playerAvatar img').forEach(img=>img.addEventListener('error',()=>img.remove(),{once:true}));}
-function chips(){invalidateTrade();for(const [side,items] of [['give',give],['receive',receive]]){$('#'+side+'Chips').innerHTML=items.length?items.map((p,i)=>`<span class="chip selectedPlayer">${avatar(players.find(x=>(x.choice||x.name)===p)||{name:p})}<span><b>${esc(p)}</b><small>${esc(players.find(x=>(x.choice||x.name)===p)?.team||'')} ${esc(players.find(x=>(x.choice||x.name)===p)?.position||'')}</small></span><button type="button" data-remove="${side}:${i}" aria-label="Remove ${esc(p)}">×</button></span>`).join(''):'<small>No players selected yet.</small>'}document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{const [side,i]=b.dataset.remove.split(':');(side==='give'?give:receive).splice(Number(i),1);chips()});bindPortraits();}
-async function bindTool(){for(const id of ['format','passingTD','replacementPoints','rosterNeed','lineupPlan'])if($('#'+id))$('#'+id).onchange=invalidateTrade;document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const side=b.dataset.add,input=$('#'+side+'Input'),name=players.find(p=>(p.choice||p.name).toLowerCase()===input.value.trim().toLowerCase())?.choice||players.find(p=>p.name.toLowerCase()===input.value.trim().toLowerCase()&&players.filter(x=>x.name===p.name).length===1)?.name;if(!name)return toast('Choose an exact player from the available list.');if([...give,...receive].includes(name))return toast('That player is already in this trade.');const target=side==='give'?give:receive;if(target.length>=3)return toast('Choose at most three players per side.');target.push(name);input.value='';chips()});$('#analyze').onclick=()=>runTrade(false);$('#analyze').disabled=true;document.querySelectorAll('[data-add]').forEach(b=>b.disabled=true);try{const requestLeague=league;const data=await api('players?league='+requestLeague);if(requestLeague!==league||!$('#playerNames'))return;players=data.players;$('#playerNames').innerHTML=players.map(p=>`<option value="${esc(p.choice||p.name)}">${esc(p.team||'')}</option>`).join('');$('#analyze').disabled=!players.length;document.querySelectorAll('[data-add]').forEach(b=>b.disabled=!players.length);$('#dataStatus').textContent=players.length?`${players.length} players with saved history. Snapshot: ${data.snapshotAt||'timestamp unavailable'}.`:'Player data is not available yet. You can explore the tools, but comparisons will be available after data is connected.';}catch(e){if($('#dataStatus'))$('#dataStatus').textContent=e.message}}
-async function runTrade(ai){if(!give.length||!receive.length)return toast('Add at least one player to each side.');const input={league,format:$('#format').value,give:give.map(n=>{const p=players.find(p=>(p.choice||p.name)===n);return p?.id?'id:'+p.id:n}),receive:receive.map(n=>{const p=players.find(p=>(p.choice||p.name)===n);return p?.id?'id:'+p.id:n}),rosterNeed:$('#rosterNeed').value,lineupPlan:$('#lineupPlan').value,passingTD:Number($('#passingTD')?.value||4),replacementPoints:$('#replacementPoints')?.value?Number($('#replacementPoints').value):null};const requestRevision=revision,requestLeague=league;const button=ai?$('#aiBrief'):$('#analyze');button.disabled=true;try{const r=await api(ai?'ai/brief':'fantasy/analyze',input);if(requestRevision!==revision||requestLeague!==league||!$('#tradeResult'))return;currentTrade=ai?r.trade:r;
+function syncTradeButton(){
+ const ready=give.length>0&&receive.length>0;
+ $('#analyze').disabled=!ready;
+ $('#tradeStatus').textContent=ready?'':'Add a player to each side to compare.';
+}
+
+function chips(){
+ invalidateTrade();
+ for(const [side,items] of [['give',give],['receive',receive]]){
+  $('#'+side+'Chips').innerHTML=items.length?items.map((player,i)=>
+   `<span class="chip selectedPlayer">${avatar(player)}<span><b>${esc(player.name)}</b><small>${esc(player.team||'')} ${esc(player.position||'')}</small></span><button type="button" data-remove="${side}:${i}" aria-label="Remove ${esc(player.choice||player.name)}">×</button></span>`
+  ).join(''):'<small>No players selected yet.</small>';
+ }
+ document.querySelectorAll('[data-remove]').forEach(button=>button.onclick=()=>{
+  const [side,index]=button.dataset.remove.split(':');
+  (side==='give'?give:receive).splice(Number(index),1);
+  chips();
+  $('#'+side+'Input').focus();
+ });
+ bindPortraits();
+ syncTradeButton();
+}
+
+const playerKey=player=>player.id?'id:'+player.id:player.choice||player.name;
+const searchKey=value=>String(value??'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+const tradeExamples={
+ NFL:[['Jahmyr Gibbs','Christian McCaffrey'],['Justin Jefferson','Ja’Marr Chase'],['Josh Allen','Lamar Jackson']],
+ NBA:[['Nikola Jokić','Victor Wembanyama'],['Luka Dončić','Shai Gilgeous-Alexander'],['Jayson Tatum','Anthony Edwards']]
+};
+
+function bindPlayerSearch(side){
+ const input=$('#'+side+'Input'),results=$('#'+side+'Matches'),status=$('#'+side+'MatchStatus');
+ const close=()=>{results.hidden=true;status.textContent='';};
+ const select=player=>{
+  const target=side==='give'?give:receive;
+  if([...give,...receive].some(other=>playerKey(other)===playerKey(player)))return toast('That player is already in this trade.');
+  if(target.length>=3)return toast('Choose at most three players per side.');
+  target.push(player);
+  input.value='';
+  close();
+  chips();
+  const next=side==='give'&&!receive.length?$('#receiveInput'):input;
+  next.focus();
+ };
+ const show=()=>{
+  const query=searchKey(input.value);
+  if(!query){close();return;}
+  const matches=players.filter(player=>searchKey(player.name).includes(query)||searchKey(player.choice).includes(query));
+  const visible=matches.slice(0,8);
+  results.innerHTML=visible.length?visible.map((player,index)=>
+   `<button type="button" class="subtle" data-match="${index}"><b>${esc(player.name)}</b><small>${esc([player.team,player.position].filter(Boolean).join(' · '))}</small></button>`
+  ).join(''):'<p>No matching players. Try another spelling.</p>';
+  results.hidden=false;
+  status.textContent=matches.length?`Showing ${visible.length} of ${matches.length} matching players.`:'No matching players.';
+  results.querySelectorAll('[data-match]').forEach(button=>{
+   button.onpointerdown=event=>event.preventDefault();
+   button.onclick=()=>select(visible[Number(button.dataset.match)]);
+  });
+ };
+ input.addEventListener('input',show);
+ input.addEventListener('focus',show);
+ input.parentElement.addEventListener('focusout',event=>{
+  if(!input.parentElement.contains(event.relatedTarget))close();
+ });
+ input.parentElement.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&!results.hidden){
+   event.preventDefault();
+   input.focus();
+   close();
+  }else if(event.target===input&&!event.isComposing&&!results.hidden&&['Enter','ArrowDown'].includes(event.key)){
+   const buttons=results.querySelectorAll('[data-match]');
+   if(!buttons.length)return;
+   event.preventDefault();
+   if(event.key==='Enter'&&buttons.length===1)buttons[0].click();
+   else buttons[0].focus();
+  }
+ });
+}
+
+async function bindTool(){
+ const trade=$('#trade'),requestLeague=league;
+ for(const id of ['format','passingTD','replacementPoints','rosterNeed','lineupPlan']){
+  if($('#'+id))$('#'+id).onchange=()=>{invalidateTrade();syncTradeButton();};
+ }
+ for(const side of ['give','receive'])bindPlayerSearch(side);
+ $('#analyze').onclick=()=>runTrade(false);
+ try{
+  const data=await api('players?league='+requestLeague);
+  if(!trade.isConnected)return;
+  players=data.players;
+  for(const side of ['give','receive'])$('#'+side+'Input').disabled=!players.length;
+  const example=tradeExamples[requestLeague].map(pair=>pair.map(name=>{
+   const matches=players.filter(player=>searchKey(player.name)===searchKey(name));
+   return matches.length===1?matches[0]:null;
+  })).find(pair=>pair.every(Boolean));
+  const exampleButton=$('#tradeExample');
+  exampleButton.disabled=!example;
+  exampleButton.hidden=!example;
+  exampleButton.onclick=()=>{
+   give=[example[0]];
+   receive=[example[1]];
+   for(const side of ['give','receive']){
+    $('#'+side+'Input').value='';
+    $('#'+side+'Matches').hidden=true;
+    $('#'+side+'MatchStatus').textContent='';
+   }
+   chips();
+   void runTrade(false);
+  };
+  $('#dataStatus').textContent=players.length?'':'Player data is temporarily unavailable. Try again later.';
+  if(players.length){
+   const at=new Date(data.snapshotAt||'');
+   const updated=Number.isFinite(at.getTime())?' Player data updated '+at.toLocaleString('en-US',{timeZone:'America/New_York',timeZoneName:'short'})+'.':'';
+   $('#tradeDataInfo').textContent=players.length+' players available for search.'+updated;
+  }
+ }catch(error){
+  if(trade.isConnected)$('#dataStatus').textContent=error.message;
+ }
+}
+
+async function runTrade(ai){if(!give.length||!receive.length)return toast('Add at least one player to each side.');const input={league,format:$('#format').value,give:give.map(playerKey),receive:receive.map(playerKey),rosterNeed:$('#rosterNeed').value,lineupPlan:$('#lineupPlan').value,passingTD:Number($('#passingTD')?.value||4),replacementPoints:$('#replacementPoints')?.value?Number($('#replacementPoints').value):null};const requestRevision=revision,requestLeague=league;const button=ai?$('#aiBrief'):$('#analyze');button.disabled=true;if(!ai)$('#tradeStatus').textContent='Comparing players…';try{const r=await api(ai?'ai/brief':'fantasy/analyze',input);if(requestRevision!==revision||requestLeague!==league||!$('#tradeResult'))return;currentTrade=ai?r.trade:r;
  $('#tradeResult').innerHTML=tradeResult(currentTrade);
  bindPortraits();
  $('#aiBrief').onclick=()=>runTrade(true);
  if($('#saveForecast'))$('#saveForecast').onclick=()=>saveForecast(input,currentTrade.forecastKey);
- if(ai){const output=$('#aiOutput');output.innerHTML=briefView(r);output.scrollIntoView({block:'nearest'});}}catch(e){toast(e.message)}finally{button.disabled=false}}
+ if(ai){const output=$('#aiOutput');output.innerHTML=briefView(r);output.scrollIntoView({block:'nearest'});}else if(document.activeElement===button||document.activeElement===$('#tradeExample')||document.activeElement===document.body){$('#tradeResult').focus();}}catch(e){if(requestRevision===revision){if(ai)toast(e.message);else $('#tradeStatus').textContent=e.message;}}finally{if(requestRevision===revision){button.disabled=false;if(!ai&&$('#tradeStatus').textContent==='Comparing players…')$('#tradeStatus').textContent='';}}}
 async function saveForecast(input, expectedKey) {
  const button=$('#saveForecast'),status=$('#forecastSaveStatus');
  button.disabled=true;
@@ -56,12 +174,17 @@ async function reviewForecasts() {
  }
 }
 
-let dailyReport=null,dailyReportLeague=null,dailyReportBook=null;const dailyOrdering={sort:'probability',status:'all',minimum:'0'};
+let dailyReport=null,dailyReportLeague=null,dailyReportBook=null;const dailyOrdering={sort:'research',status:'all',minimum:'0'};
 function renderDailyPicks(preserve=false){if(!$('#dailyResults')||!dailyReport||dailyReportLeague!==league||dailyReportBook!==sportsbook)return;$('#dailyResults').className='';replaceView($('#dailyResults'),picksResults(dailyReport,dailyOrdering),{preserve});bindPortraits();}
 function bindPickOrdering(){for(const [id,key] of [['pickSort','sort'],['pickStatus','status'],['pickMinimum','minimum']]){const select=$('#'+id);if(!select)continue;select.value=dailyOrdering[key];select.onchange=()=>{dailyOrdering[key]=select.value;renderDailyPicks(true);};}}
 let pickRequest=0,marketRequest=0,dailyView='shortlist',marketFilters={eventID:'',playerKey:'',stat:'',side:'',search:'',limit:25},marketData=null,gameRequest=0,gameFilters={eventID:'',kind:'Moneyline',cursor:'0'};
 async function loadPicks(force=false,quiet=false){const b=$('#loadPicks');if(!b||b.disabled&&!force)return;const id=++pickRequest;b.disabled=true;const requestLeague=league,requestBook=sportsbook;if(!quiet)$('#dailyResults').textContent='Checking the latest prices and player history…';try{const r=await api('picks?league='+requestLeague+'&book='+requestBook);if(id!==pickRequest||requestLeague!==league||requestBook!==sportsbook||!$('#dailyResults'))return;dailyReport=r;dailyReportLeague=requestLeague;dailyReportBook=requestBook;renderDailyPicks(quiet);}catch(e){if(id===pickRequest&&$('#dailyResults')){if(quiet)showUpdateError(e);else $('#dailyResults').textContent=e.message;}}finally{if(id===pickRequest)b.disabled=false}}
-function setDailyView(view){const changed=dailyView!==view;dailyView=view;$('#dailyShortlist').hidden=view!=='shortlist';$('#dailyMarketCoverage').hidden=view!=='markets';$('#dailyGameCoverage').hidden=view!=='games';for(const [id,name] of [['shortlistView','shortlist'],['marketView','markets'],['gameView','games']]){$('#'+id).classList.toggle('active',view===name);$('#'+id).setAttribute('aria-pressed',String(view===name));}if(changed){if(view==='shortlist')void loadPicks();if(view==='markets')void loadMarketCoverage();if(view==='games')void loadGameMarkets();}}
+function loadDailyView(){
+ if(dailyView==='markets')return loadMarketCoverage();
+ if(dailyView==='games')return loadGameMarkets();
+ return loadPicks(true);
+}
+function setDailyView(view,reload=false){const changed=dailyView!==view;dailyView=view;$('#dailyShortlist').hidden=view!=='shortlist';$('#dailyMarketCoverage').hidden=view!=='markets';$('#dailyGameCoverage').hidden=view!=='games';for(const [id,name] of [['shortlistView','shortlist'],['marketView','markets'],['gameView','games']]){$('#'+id).classList.toggle('active',view===name);$('#'+id).setAttribute('aria-pressed',String(view===name));}$('#loadPicks').textContent=view==='shortlist'?`Find ${league} picks`:'Reload lines';if(changed||reload)void loadDailyView();}
 function bindMarketCoverage(){
  $('#marketGame').onchange=()=>{marketFilters.eventID=$('#marketGame').value;marketFilters.playerKey='';marketFilters.stat='';marketFilters.side='';marketFilters.limit=25;void loadMarketCoverage();};
  $('#marketPlayerSearch').oninput=()=>{marketFilters.search=$('#marketPlayerSearch').value;$('#marketPlayerGrid').innerHTML=marketPlayerCards(marketData,marketFilters.search);bindPortraits();};

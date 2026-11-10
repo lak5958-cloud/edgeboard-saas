@@ -1,7 +1,7 @@
 // Presentation only. Sorting never promotes a Pass or changes a probability.
 export const hitChance=p=>typeof p.experimentalProbability==='number'&&Number.isFinite(p.experimentalProbability)&&p.experimentalProbability>=0&&p.experimentalProbability<=1?p.experimentalProbability:null;
 export const remainingChecks=p=>(p.checks||[]).filter(c=>c.status!=='pass');
-export function rankDailyPicks(report,{sort='probability',status='all',minimum='0'}={}){
+export function rankDailyPicks(report,{sort='research',status='all',minimum='0'}={}){
  const threshold=['0','0.6','0.7','0.8'].includes(String(minimum))?Number(minimum):0;
  const rows=[...(report.picks||[]).map(p=>({pick:p,watch:false})),...(report.watchlist||[]).map(p=>({pick:p,watch:true}))];
  const filtered=rows.filter(({pick:p,watch})=>

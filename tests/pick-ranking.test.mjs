@@ -8,15 +8,18 @@ const pick=(player,p,net,label='LEAN',checks=[])=>({player,experimentalProbabili
 const blocked=[{id:'bound',status:'fail',label:'Historical check'}];
 const report={book:'draftkings',picks:[pick('Lean',.68,.2)],watchlist:[pick('Higher estimate',.82,.1,'PASS',blocked),pick('Two missing',.73,.3,'PASS',[...blocked,{id:'replay',status:'unknown'}]),pick('Unavailable',null,.4,'PASS',blocked)],counts:{},excluded:{}};
 test('a high-probability Pass can rank first without changing its decision, price or input arrays',()=>{
- const before=structuredClone(report),rows=rankDailyPicks(report);
+ const before=structuredClone(report),rows=rankDailyPicks(report,{sort:'probability'});
  assert.deepEqual(rows.map(r=>r.pick.player),['Higher estimate','Two missing','Lean','Unavailable']);
  assert.equal(rows[0].watch,true);assert.equal(rows[0].pick.label,'PASS');assert.equal(rows[0].pick.odds,-150);
  assert.deepEqual(report,before);
- const html=picksResults(report);assert(html.indexOf('Higher estimate')<html.indexOf('<h3>Lean</h3>'));
+ const html=picksResults(report,{sort:'probability'});assert(html.indexOf('Higher estimate')<html.indexOf('<h3>Lean</h3>'));
  assert.match(html,/PASS · Watchlist · 1 check remaining/);assert.match(html,/A high estimated hit chance does not clear these checks/);
 });
 test('probability, value and research sorting represent different choices',()=>{
+ assert.equal(rankDailyPicks(report)[0].pick.player,'Lean');
  assert.equal(rankDailyPicks(report,{sort:'research'})[0].pick.player,'Lean');
+ const html=picksResults(report);
+ assert(html.indexOf('<h3>Lean</h3>')<html.indexOf('<h3>Higher estimate</h3>'));
  assert.equal(rankDailyPicks(report,{sort:'value'})[0].pick.player,'Unavailable');
  assert.equal(rankDailyPicks(report,{sort:'probability'})[0].pick.player,'Higher estimate');
  const tied={picks:[pick('Lean',.8,.1)],watchlist:[pick('Pass',.8,.1,'PASS',blocked)]};
@@ -37,4 +40,13 @@ test('the page explains that ordering is not an upgrade, and empty feeds explain
  const empty=picksResults({book:'fanduel',picks:[],watchlist:[],counts:{},excluded:{},coverage:0,oddsStatus:{status:'limited',message:'Scheduled hours only.'}});
  assert.match(empty,/Scheduled hours only/);assert.match(empty,/owner can request a fresh board from Research/);
  assert(!empty.includes('70.0%'));assert.match(empty,/No picks or hit estimates are invented/);
+});
+
+test('expired prices and fresh scans with no qualifying picks have different next steps',()=>{
+ const base={book:'fanduel',picks:[],watchlist:[],counts:{},coverage:1,complete:true,generatedAt:'2026-11-10T23:00:00Z'};
+ assert.match(picksResults(base),/No picks qualified/);
+ const expired=picksResults({...base,latestExpiredQuoteAt:'2026-11-10T22:00:00Z'});
+ assert.match(expired,/Shortlist prices are out of date/);
+ assert.match(expired,/latest expired shortlist price was checked/);
+ assert.match(expired,/Browse all player lines/);
 });
