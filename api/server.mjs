@@ -17,7 +17,7 @@ import {workspaceScope,workspaceMeta,workspacePage} from '../lib/research-worksp
 import {withCurrentProfiles} from '../lib/profiles.mjs';
 import {runRefresh} from '../lib/refresh.mjs';import {publicDailyPicks} from '../lib/daily-picks.mjs';
 import {gzipSync} from 'node:zlib';import {pageRows} from '../lib/snapshot-pages.mjs';
-import {createHash,timingSafeEqual} from 'node:crypto';import {AppError,required,sb,snapshot,snapshotRevision,bundle,request} from '../lib/cloud.mjs';import {accessFor,requirePro,login,sessionCookies,userFor} from '../lib/auth.mjs';import {billingReadiness,checkout,stripe,verifyWebhook,handleStripeEvent} from '../lib/billing.mjs';import {playerList,analyzeTrade} from '../lib/fantasy.mjs';import {scanGamePicks} from '../lib/picks.mjs';
+import {createHash,timingSafeEqual} from 'node:crypto';import {AppError,required,sb,snapshot,snapshotRevision,bundle,request} from '../lib/cloud.mjs';import {accessFor,requirePro,login,sessionCookies,userFor} from '../lib/auth.mjs';import {billingReadiness,verifyBillingConfig,checkout,stripe,verifyWebhook,handleStripeEvent} from '../lib/billing.mjs';import {playerList,analyzeTrade} from '../lib/fantasy.mjs';import {scanGamePicks} from '../lib/picks.mjs';
 export const config={api:{bodyParser:false}};
 const json=(res,status,data)=>{res.statusCode=status;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','private, no-store');const body=JSON.stringify(data);if(Buffer.byteLength(body)>32768){res.setHeader('Content-Encoding','gzip');res.setHeader('Vary','Accept-Encoding');res.end(gzipSync(body));}else res.end(body);};
 async function rawBody(req){const parts=[];let size=0;for await(const part of req){size+=part.length;if(size>65536)throw new AppError(413,'Request is too large.');parts.push(part);}return Buffer.concat(parts);}
@@ -35,7 +35,15 @@ export default async function handler(req,res){try{
  }
  if(req.method!=='GET'&&req.method!=='POST')throw new AppError(405,'Method not allowed.');
  if(req.method==='POST')origin(req);
- if(route==='billing/config')return json(res,200,billingReadiness());
+ if(route==='billing/config'){
+  if(url.searchParams.get('verify')==='1'){
+   if(req.method!=='GET')throw new AppError(405,'GET required.');
+   requirePro(await accessFor(req,res));
+   await budget(req,'billing-config',10);
+   return json(res,200,await verifyBillingConfig());
+  }
+  return json(res,200,billingReadiness());
+ }
  if(route==='health')return json(res,200,{version:'1.12.1',saasVersion:'2.2.0',refreshSupported:true,connected:!!process.env.SUPABASE_URL});
  if(route==='session')return json(res,200,await accessFor(req,res));
  if(['auth/login','auth/signup'].includes(route)){if(req.method!=='POST')throw new AppError(405,'POST required.');await budget(req,'auth',20);const b=JSON.parse((await rawBody(req)).toString());return json(res,200,await login(res,b.email,b.password,route.endsWith('signup')));}

@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {subscriptionEntitlement,syncSubscription,handleStripeEvent,riskSubscriptions} from '../lib/billing.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {subscriptionEntitlement,syncSubscription,handleStripeEvent,riskSubscriptions,stripe,verifyBillingConfig} from '../lib/billing.mjs';
 const user='00000000-0000-4000-8000-000000000001',price='price_synthetic',subscription={id:'sub_synthetic',customer:'cus_synthetic',status:'active',latest_invoice:{status:'paid'},metadata:{user_id:user},items:{data:[{price:{id:price},current_period_end:Math.floor(Date.now()/1000)+86400}]}};
 const env=async fn=>{const keys=['STRIPE_SECRET_KEY','STRIPE_PRICE_ID'],old=Object.fromEntries(keys.map(k=>[k,process.env[k]]));process.env.STRIPE_SECRET_KEY='rk_test_synthetic';process.env.STRIPE_PRICE_ID=price;try{await fn()}finally{for(const k of keys)if(old[k]===undefined)delete process.env[k];else process.env[k]=old[k]}};
 test('paid, failed and period-end cancellations map to subscription access only',async()=>{const active=subscriptionEntitlement({...subscription,cancel_at_period_end:true},price);assert(Date.parse(active.expires_at)>Date.now());assert.equal(subscriptionEntitlement({...subscription,status:'past_due'},price).expires_at,'1970-01-01T00:00:00.000Z');assert.equal(subscriptionEntitlement(subscription,'wrong_price'),null);await env(async()=>{const calls=[];await syncSubscription(subscription.id,{api:async()=>subscription,db:async(path,options)=>{calls.push({path,options});return []}});const writes=calls.filter(c=>c.options);assert.equal(writes.length,1);assert.equal(JSON.parse(writes[0].options.body).kind,'subscription');assert(calls.every(c=>!c.path.includes('kind=eq.owner')&&!c.path.includes('kind=eq.grader')));});});
@@ -7,3 +7,24 @@ test('wrong-mode webhooks fail before access writes and unpaid checkout cannot g
 test('risk events follow all invoice-payment pages and do not issue refunds or cancellations',async()=>env(async()=>{const paths=[],db=[];const api=async path=>{paths.push(path);if(path.startsWith('charges/'))return {payment_intent:'pi_synthetic'};if(path.startsWith('invoice_payments?'))return path.includes('starting_after')?{data:[{id:'inpay_2',invoice:'in_2'}],has_more:false}:{data:[{id:'inpay_1',invoice:'in_1'}],has_more:true};if(path.startsWith('invoices/'))return {parent:{type:'subscription_details',subscription_details:{subscription:path.endsWith('in_1')?'sub_one':'sub_two'}}};if(path.startsWith('subscriptions/'))return {...subscription,id:path.split('/')[1]};throw Error('Unexpected mutation')};assert.deepEqual(await riskSubscriptions({charge:'ch_synthetic'},{api}),['sub_one','sub_two']);await handleStripeEvent({id:'evt_dispute',type:'charge.dispute.created',livemode:false,created:1,data:{object:{id:'dp_synthetic',charge:'ch_synthetic'}}},{api,db:async(path,options)=>{if(options)db.push({path,options});return []}});const audit=db.find(c=>c.path.includes('billing_events'));assert.equal(JSON.parse(audit.options.body).review_required,true);assert(paths.every(p=>!p.includes('/cancel')&&!p.startsWith('refunds')));}));
 test('an active subscription without a paid invoice cannot unlock Pro',async()=>env(async()=>{let stored;await syncSubscription(subscription.id,{api:async()=>({...subscription,latest_invoice:{status:'open'}}),db:async(path,options)=>{if(options)stored=JSON.parse(options.body);return []}});assert.equal(stored.expires_at,'1970-01-01T00:00:00.000Z');}));
 test('duplicate signed event IDs do not reopen already reviewed risk tasks',async()=>env(async()=>{let writes=0;const r=await handleStripeEvent({id:'evt_duplicate',type:'charge.refunded',livemode:false,created:1,data:{object:{id:'ch_synthetic'}}},{api:async()=>{throw Error('Duplicate must not repeat Stripe lookup')},db:async(path,options)=>{if(options)writes++;return [{id:'evt_duplicate'}]}});assert.equal(r.duplicate,true);assert.equal(writes,0);}));
+
+test('Stripe errors identify the failing permission or price without exposing provider text',async t=>env(async()=>{
+ const response=t.mock.method(globalThis,'fetch',async()=>Response.json({error:{message:'Sensitive upstream details'}},{status:403,headers:{'request-id':'req_Test123'}}));
+ await assert.rejects(()=>stripe('prices/price_synthetic'),error=>error.status===503&&/Prices Read.*req_Test123/.test(error.message)&&!error.message.includes('Sensitive upstream'));
+ await assert.rejects(()=>stripe('checkout/sessions',{}),/Checkout Sessions Write/);
+ response.mock.mockImplementation(async()=>Response.json({error:{code:'resource_missing'}},{status:404}));
+ await assert.rejects(()=>stripe('prices/price_synthetic'),/price ID and API key belong to the same Stripe account and mode/);
+}));
+
+test('configuration verification uses a read-only price lookup and validates the recurring plan',async t=>env(async()=>{
+ t.mock.method(globalThis,'fetch',async(url,options)=>{
+  assert.equal(url,'https://api.stripe.com/v1/prices/price_synthetic');
+  assert.equal(options.method,'GET');
+  return Response.json({id:price,active:true,unit_amount:799,currency:'usd',livemode:false,recurring:{interval:'month',interval_count:1}});
+ });
+ const old={APP_URL:process.env.APP_URL,STRIPE_WEBHOOK_SECRET:process.env.STRIPE_WEBHOOK_SECRET};
+ process.env.APP_URL='https://example.org';
+ process.env.STRIPE_WEBHOOK_SECRET='whsec_synthetic';
+ try{assert.equal((await verifyBillingConfig()).priceVerified,true);}
+ finally{for(const key of Object.keys(old))if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}
+}));
