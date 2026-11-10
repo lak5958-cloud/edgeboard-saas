@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {subscriptionEntitlement,syncSubscription,handleStripeEvent,riskSubscriptions,stripe,verifyBillingConfig} from '../lib/billing.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {subscriptionEntitlement,syncSubscription,handleStripeEvent,riskSubscriptions,stripe,verifyBillingConfig,checkout} from '../lib/billing.mjs';
 const user='00000000-0000-4000-8000-000000000001',price='price_synthetic',subscription={id:'sub_synthetic',customer:'cus_synthetic',status:'active',latest_invoice:{status:'paid'},metadata:{user_id:user},items:{data:[{price:{id:price},current_period_end:Math.floor(Date.now()/1000)+86400}]}};
 const env=async fn=>{const keys=['STRIPE_SECRET_KEY','STRIPE_PRICE_ID'],old=Object.fromEntries(keys.map(k=>[k,process.env[k]]));process.env.STRIPE_SECRET_KEY='rk_test_synthetic';process.env.STRIPE_PRICE_ID=price;try{await fn()}finally{for(const k of keys)if(old[k]===undefined)delete process.env[k];else process.env[k]=old[k]}};
 test('paid, failed and period-end cancellations map to subscription access only',async()=>{const active=subscriptionEntitlement({...subscription,cancel_at_period_end:true},price);assert(Date.parse(active.expires_at)>Date.now());assert.equal(subscriptionEntitlement({...subscription,status:'past_due'},price).expires_at,'1970-01-01T00:00:00.000Z');assert.equal(subscriptionEntitlement(subscription,'wrong_price'),null);await env(async()=>{const calls=[];await syncSubscription(subscription.id,{api:async()=>subscription,db:async(path,options)=>{calls.push({path,options});return []}});const writes=calls.filter(c=>c.options);assert.equal(writes.length,1);assert.equal(JSON.parse(writes[0].options.body).kind,'subscription');assert(calls.every(c=>!c.path.includes('kind=eq.owner')&&!c.path.includes('kind=eq.grader')));});});
@@ -27,4 +27,39 @@ test('configuration verification uses a read-only price lookup and validates the
  process.env.STRIPE_WEBHOOK_SECRET='whsec_synthetic';
  try{assert.equal((await verifyBillingConfig()).priceVerified,true);}
  finally{for(const key of Object.keys(old))if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}
+}));
+
+test('sandbox Checkout opts out of the account default and retries under a new idempotency key',async t=>env(async()=>{
+ const overrides={APP_URL:'https://example.org',STRIPE_WEBHOOK_SECRET:'whsec_synthetic',SUPABASE_URL:'https://example.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'synthetic'};
+ const old=Object.fromEntries(Object.keys(overrides).map(key=>[key,process.env[key]]));
+ Object.assign(process.env,overrides);
+ const attempts=[];
+ t.mock.method(globalThis,'fetch',async(input,options)=>{
+  const url=new URL(input);
+  if(url.hostname==='example.supabase.co'){
+   assert.equal(url.pathname,'/rest/v1/entitlements');
+   return Response.json([]);
+  }
+  if(url.pathname==='/v1/prices/price_synthetic'){
+   return Response.json({id:price,active:true,unit_amount:799,currency:'usd',livemode:false,recurring:{interval:'month',interval_count:1}});
+  }
+  assert.equal(url.pathname,'/v1/checkout/sessions');
+  assert.equal(options.method,'POST');
+  assert.equal(options.body.get('managed_payments[enabled]'),'false');
+  assert.equal(options.body.get('mode'),'subscription');
+  assert.equal(options.body.get('line_items[0][price]'),price);
+  assert.equal(options.body.get('subscription_data[metadata][user_id]'),user);
+  const key=options.headers['Idempotency-Key'];
+  assert(key.startsWith('edgeboard-checkout-standard-'));
+  attempts.push(key);
+  return Response.json({id:'cs_test_synthetic'});
+ });
+ try{
+  await checkout({id:user,email:'test@example.org'});
+  await checkout({id:user,email:'test@example.org'});
+  assert.equal(attempts.length,2);
+  assert.equal(attempts[0],attempts[1]);
+ }finally{
+  for(const key of Object.keys(old))if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];
+ }
 }));
