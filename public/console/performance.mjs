@@ -19,18 +19,18 @@ async function coverage(){
 }
 el('coverageRefresh').onclick=()=>void coverage();
 for(const id of ['sport','book'])el(id).onchange=()=>{el('results').replaceChildren();el('performanceStatus').textContent='Review completed slates for this sport and sportsbook.';void coverage();};
-el('scope').onchange=()=>{el('results').replaceChildren();el('performanceStatus').textContent='Review completed slates for this forecast group.';};
+el('scope').onchange=el('allAuditMarkets').onchange=()=>{el('results').replaceChildren();el('performanceStatus').textContent='Review completed slates for this forecast group.';};
 el('compare').onclick=async()=>{
  el('compare').disabled=true;
- const league=el('sport').value,book=el('book').value,scope=el('scope').value;
+ const league=el('sport').value,book=el('book').value,scope=el('scope').value,all=el('allAuditMarkets').checked;
  try{
   const {dates}=await requestJson('/api/frozen-audit-dates'),selected=dates.filter(d=>d.completed&&(scope==='games'?d.gameSnapshots:d.snapshots)>0).slice(-7),audits=[];
   for(let i=0;i<selected.length;i++){
    el('performanceStatus').textContent='Reading completed slate '+(i+1)+' of '+selected.length+'…';
    const audit=await requestJson('/api/frozen-audit?'+new URLSearchParams({day:selected[i].day,scope}),{timeoutMs:90000});
-   audits.push({...audit,results:audit.results.filter(r=>r.league===league&&r.book===book)});
+   audits.push({...audit,results:all?audit.results:audit.results.filter(r=>r.league===league&&r.book===book)});
   }
-  if(league!==el('sport').value||book!==el('book').value||scope!==el('scope').value)return;
+  if((!all&&(league!==el('sport').value||book!==el('book').value))||scope!==el('scope').value||all!==el('allAuditMarkets').checked)return;
   const lab=await compare(audits),summary=summarizeAudits(audits);
   el('results').innerHTML=performanceHeadline(audits,summary)+modelLabView(audits,lab)+auditSummaryView(summary);
   el('performanceStatus').textContent=audits.length?'Reviewed '+audits.length+' completed slates. Candidate scores remain experimental.':'No completed archived slates are available.';

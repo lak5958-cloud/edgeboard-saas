@@ -10,3 +10,21 @@ test('unchanged workspace versions skip quotes and history downloads',async()=>{
 test('a published version change during pagination restarts the whole read instead of mixing data',async()=>{let meta=0;const read=createWorkspaceReader(async u=>{const p=new URL(u,'https://example.org').searchParams;if(p.get('part')==='meta')return metadata(++meta===1?'v1':'v2');if(p.get('version')==='v1')throw Object.assign(Error('changed'),{status:409});return {version:'v2',items:[p.get('part')],next:null};});const r=await read({league:'NBA'});assert.equal(r.version,'v2');assert.deepEqual(r.board.quotes,['quotes']);assert.deepEqual(r.records,['records']);assert.equal(meta,2);});
 test('rapid navigation discards a late result from the previous matchup',async()=>{let finish;const read=createWorkspaceReader(async(u)=>{const p=new URL(u,'https://example.org').searchParams;if(p.get('part')==='meta'&&p.get('game')==='old')return await new Promise(resolve=>{finish=resolve});if(p.get('part')==='meta')return {...metadata('new'),scope:{game:'new'}};return {version:'new',items:[],next:null};});const first=read({league:'NBA',game:'old'});const next=await read({league:'NBA',game:'new'});finish(metadata('old'));assert.equal(await first,null);assert.equal(next.version,'new');});
 test('daily picks defines Lean/Pass and shows actual estimated win probability with explicit limits',()=>{const h=picksPage('NFL');assert.match(h,/Lean:/);assert.match(h,/Pass:/);assert.match(h,/high estimated hit chance can still be a Pass/);const p={player:'Synthetic',stat:'receptions',side:'under',line:3.5,odds:-151,book:'draftkings',experimentalProbability:.744,breakEven:.602,modelEvidence:{replay:16,lower:.538},checks:[{id:'replay',status:'fail'},{id:'bound',status:'fail'}]};const card=pickCard(p,true);assert.match(card,/74.4%/);assert.match(card,/Experimental estimated hit chance/);assert.match(card,/4 more eligible historical test predictions/);assert.match(card,/53.8%/);assert.match(card,/60.2%/);assert(!card.includes('Confidence: 8'));assert.match(shortlistCoverage({book:'draftkings',counts:{scanned:2524,modeled:276,positiveModelReturn:6},picks:[],watchlist:[p,p]}),/2524.*276.*6/);});
+test('a removed matchup refreshes the game list without replacing the exact selection',async()=>{
+ const missing=workspaceScope(data,{league:'NBA',eventID:'older-A',game:'A @ B',allowRemoved:true},now);
+ assert.equal(missing.matchupRemoved,true);
+ assert.equal(missing.selected,undefined);
+ const meta={...workspaceMeta(data,missing,{},now),version:'v2'};
+ const calls=[];
+ const read=createWorkspaceReader(async url=>{calls.push(new URL(url,'https://example.org').searchParams);return meta;});
+ const result=await read({league:'NBA',game:'A @ B',eventID:'older-A',knownVersion:'v1'});
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].get('eventID'),'older-A');
+ assert.equal(result.matchupRemoved,true);
+ assert.equal(result.board.games.length,3);
+ assert.deepEqual(result.board.quotes,[]);
+ assert.deepEqual(result.records,[]);
+ assert.throws(()=>workspaceScope(data,{league:'NBA',eventID:'older-A'},now),{status:409});
+ assert.equal(workspaceScope(data,{league:'NBA',unselected:true},now).selected,null);
+ assert.equal(workspaceScope(data,{league:'NBA',eventID:'A',allowRemoved:true},now).selected.eventID,'A');
+});

@@ -1,5 +1,38 @@
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pct=x=>typeof x==='number'&&Number.isFinite(x)?(100*x).toFixed(1)+'%':'—';
+export function decisionReadback(decision,breakEven,lower){
+ const checks=decision?.checks||[];
+ const byID=id=>checks.find(c=>c.id===id);
+ const priceText=Number.isFinite(decision?.conditionalWin)&&Number.isFinite(breakEven)
+  ? `The model estimates ${pct(decision.conditionalWin)} wins among non-push outcomes. This price needs ${pct(breakEven)} to break even.`
+  : '';
+ const sampleText=Number.isFinite(lower)&&Number.isFinite(breakEven)
+  ? `The cautious historical estimate is ${pct(lower)}, ${lower>breakEven?'above':lower===breakEven?'equal to':'below'} break-even.`
+  : '';
+ if(decision?.label==='LEAN'){
+  const history=[byID('current'),byID('replay')].filter(c=>c?.status==='pass').map(c=>c.detail.split('. ')[0]+'.').join(' ');
+  return ['Lean at this price. '+(priceText||'The price and evidence cleared the research checks.'),sampleText,history,'The forecast is experimental.'].filter(Boolean).join(' ');
+ }
+ const blockers=decision?.blockers||checks.filter(c=>['fail','unknown'].includes(c.status));
+ const priority=['quote','availability','price','forecast','matchup','return','bound','current','replay','push'];
+ const first=priority.map(id=>blockers.find(c=>c.id===id)).find(Boolean)||blockers[0];
+ const reasons={
+  quote:'The exact price could not be verified as current.',
+  availability:'A player availability report blocks this pick.',
+  price:'A valid exact price is missing.',
+  forecast:'There is too little verified evidence for a supported forecast.',
+  matchup:'The game-market model still needs independent validation.',
+  return:'The model does not show a positive return at this price.',
+  bound:'The cautious historical estimate must be above break-even.',
+  current:'There are too few verified games with the current team.',
+  replay:'There are too few earlier games to test the forecast.',
+  push:'The current rules require a line with zero estimated chance of a push.'
+ };
+ if(!first)return 'Pass. The available evidence does not support a Lean at this price.';
+ const detail=first.id==='bound'&&sampleText?sampleText:first.id==='return'&&priceText?priceText:first.detail;
+ const others=blockers.length>1?`${blockers.length-1} other ${blockers.length===2?'check also needs':'checks also need'} attention. See all checks below.`:'';
+ return ['Pass at this price. '+(reasons[first.id]||first.label+'.'),detail,others].filter(Boolean).join(' ');
+}
 export function renderDecisionChecks(decision,{compact=false}={}){
  if(!decision?.checks)return '<p>No recommendation checks available for this selection.</p>';
  const failed=decision.blockers||[],title=failed.length?`${failed.length} unmet or unverified Lean requirement${failed.length===1?'':'s'}`:'All experimental Lean requirements met';

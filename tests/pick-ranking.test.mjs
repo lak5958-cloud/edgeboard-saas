@@ -50,3 +50,11 @@ test('expired prices and fresh scans with no qualifying picks have different nex
  assert.match(expired,/latest expired shortlist price was checked/);
  assert.match(expired,/Browse all player lines/);
 });
+test('verdict readback gives the price evidence for a Lean and the blocking check for a Pass',()=>{
+ const modelEvidence={conditionalWin:.68,lower:.62};
+ const lean=pickCard({...report.picks[0],modelEvidence});
+ assert.match(lean,/Why this decision\?.*Lean at this price.*68\.0%.*60\.0%.*62\.0%, above break-even/);
+ const watch=pickCard({...report.watchlist[0],modelEvidence:{conditionalWin:.82,lower:.51}},true);
+ assert.match(watch,/Why this decision\?.*Pass at this price.*51\.0%, below break-even/);
+ assert.doesNotMatch(watch,/Lean at this price/);
+});
