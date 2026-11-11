@@ -7,15 +7,26 @@ import {forecast} from '../lib/prediction.mjs';
 import {matchupForecast} from '../lib/matchup-model.mjs';
 import {teamSelection} from '../lib/team-research.mjs';
 import {belongsToGame,quoteProfile} from '../lib/rosters.mjs';
+import {indexMarketPairs, marketBenchmark} from '../lib/market-benchmark.mjs';
 import {latestQuotes} from '../lib/quote-selection.mjs';
 import {summarizeAudits} from '../lib/audit-summary.mjs';
 
-const [boardFile,evidenceFile,rosterFile,teamFile,verifiedResultsFile]=process.argv.slice(2);
+const args = process.argv.slice(2);
+const strict = args.includes('--point-in-time');
+const outcomeIndex = args.indexOf('--team-outcomes');
+const teamOutcomesFile = outcomeIndex >= 0 ? args.splice(outcomeIndex, 2)[1] : null;
+const [boardFile,evidenceFile,rosterFile,teamFile,verifiedResultsFile] = args.filter(arg => arg !== '--point-in-time');
 if(!teamFile) throw Error('Usage: node scripts/replay-saved-odds.mjs board.json evidence.json roster.json team-history.json [verified-audit-outcomes.json]');
 const read=path=>JSON.parse(readFileSync(path,'utf8'));
 const board=read(boardFile),records=read(evidenceFile),rosters=read(rosterFile),teamRows=read(teamFile).games;
 const cutoff=new Date(board.generatedAt);
 if(!Number.isFinite(cutoff.getTime())) throw Error('A dated board observation is required.');
+const verifiedByCutoff = row => {
+ const known = Date.parse(row.firstVerifiedAt || row.observedAt);
+ return Number.isFinite(known) && known <= cutoff.getTime();
+};
+const trainingTeamRows = strict ? teamRows.filter(verifiedByCutoff) : teamRows;
+const marketPairs = indexMarketPairs(board.quotes);
 const day=cutoff.toLocaleDateString('en-CA',{timeZone:'America/New_York'}),gameMap=new Map(board.games.map(g=>[g.eventID,g]));
 const profiles=new Map(),conflictingProfiles=new Set();
 for(const p of [...rosters,...records.map(r=>r.profile).filter(Boolean)]){
@@ -37,7 +48,7 @@ for(const r of records){
 const byBook={},entries=[],coverage={eligibleProps:0,missingRosterIdentity:0,noPropForecast:0,eligibleGameLines:0,noGameForecast:0};
 for(const q of latestQuotes(board.quotes)){
  const game=gameMap.get(q.eventID),asOf=Date.parse(q.asOf);
- if(!game||q.periodID!=='game'||q.alt!==false||!['draftkings','fanduel'].includes(q.book)||implied(q.odds)===null||!Number.isFinite(asOf)||asOf>cutoff.getTime()||!quoteStatus(q,game,cutoff).ok)continue;
+ if(!game||q.periodID!=='game'||q.alt!==false||!['draftkings','fanduel'].includes(q.book)||implied(q.odds)===null||!Number.isFinite(asOf)||asOf>cutoff.getTime()||Number.isFinite(Date.parse(q.observedAt))&&Date.parse(q.observedAt)>cutoff.getTime()||!quoteStatus(q,game,cutoff).ok)continue;
  if(new Date(game.start).toLocaleDateString('en-CA',{timeZone:'America/New_York'})!==day)continue;
  if(q.kind==='Player Prop'){
   if(!q.player||!nameKey(q.player)||!Number.isFinite(q.line)||!['over','under'].includes(q.side))continue;
@@ -47,16 +58,16 @@ for(const q of latestQuotes(board.quotes)){
    coverage.missingRosterIdentity++;
    continue;
   }
-  const history=(series.get(JSON.stringify([q.league,String(profile.id),normalizeStat(q.stat)]))||[]).map(r=>({...r,profile,games:(r.games||[]).filter(g=>g.date<q.asOf.slice(0,10))}));
+  const history=(series.get(JSON.stringify([q.league,String(profile.id),normalizeStat(q.stat)]))||[]).map(r=>({...r,profile,games:(r.games||[]).filter(g=>g.date<q.asOf.slice(0,10)&&(!strict||verifiedByCutoff(g)))}));
   const sample=sampleSummary(q,history),model=sample&&forecast(q,sample,{now:cutoff,game,evaluate:false});
   if(model?.status!=='experimental'){coverage.noPropForecast++;continue;}
   const leagues=(byBook[q.book]??={leagues:{}}).leagues;
-  (leagues[q.league]??={picks:[]}).picks.push({quote:q,game,athleteID:profile.id,player:q.player,stat:q.stat,side:q.side,line:q.line,odds:q.odds,asOf:q.asOf,label:'REPLAY',experimentalProbability:model.pWin,modelEvidence:{pPush:model.pPush}});
+  (leagues[q.league]??={picks:[]}).picks.push({quote:q,game,athleteID:profile.id,player:q.player,stat:q.stat,side:q.side,line:q.line,odds:q.odds,asOf:q.asOf,label:'REPLAY',experimentalProbability:model.pWin,modelEvidence:{pPush:model.pPush},marketBenchmark:marketBenchmark(q,marketPairs,game,cutoff)});
  }else{
   const selection=teamSelection(q,game);
   if(!selection)continue;
   coverage.eligibleGameLines++;
-  const model=matchupForecast(q,game,teamRows,selection);
+  const model=matchupForecast(q,game,trainingTeamRows,selection);
   if(model.status!=='experimental'){coverage.noGameForecast++;continue;}
   entries.push({quote:q,game,label:'REPLAY',probability:model.pWin,push:model.pPush});
  }
@@ -69,6 +80,6 @@ if(verifiedResultsFile)for(const result of read(verifiedResultsFile)){
  settlementRecords.push({league:result.league,athleteID:result.athleteID,stat:result.stat,periodID:'game',games:[{gameID:result.gameID,date:new Date(game.start).toISOString().slice(0,10),seasonType:'regular',value:result.actual,source:result.source}]});
 }
 const props=auditFrozen(wrap({byBook,modelVersion:'reconstructed-props'}),settlementRecords,{day});
-const games=auditFrozenGames(wrap({entries,modelVersion:'reconstructed-game-lines'}),teamRows,{day});
-const summarize=a=>({excluded:a.excluded,...summarizeAudits([a]).overall,byStatistic:summarizeAudits([a]).byStatistic.map(({group,selections,scored,brier,quotedPriceBrier})=>({group,selections,scored,brier,quotedPriceBrier}))});
-console.log(JSON.stringify({day,observation:board.generatedAt,coverage,settlementSource:verifiedResultsFile?'Local results plus verified frozen-audit outcomes. Scored prop coverage inherits the audited shortlist selection bias.':'Local result files',props:summarize(props),games:summarize(games),method:'Offline reconstruction using saved standard odds, dated roster identity, and only prior game dates in model fitting. Excludes historical injuries and projections. Separate from frozen forecasts.'},null,2));
+const games=auditFrozenGames(wrap({entries,modelVersion:'reconstructed-game-lines'}),[...teamRows,...(teamOutcomesFile?read(teamOutcomesFile):[])],{day});
+const summarize=a=>{const summary=summarizeAudits([a]);return {excluded:a.excluded,...summary.overall,byLeague:summary.byLeague,verifiedGames:new Set(a.results.filter(row=>row.brier!==null).map(row=>row.eventID)).size,byStatistic:summary.byStatistic.map(({group,selections,scored,brier,quotedPriceBrier})=>({group,selections,scored,brier,quotedPriceBrier}))};};
+console.log(JSON.stringify({day,observation:board.generatedAt,pointInTimeVerified:strict,coverage,settlementSource:verifiedResultsFile?'Local results plus verified frozen-audit outcomes. Scored prop coverage inherits the audited shortlist selection bias.':'Local result files',props:summarize(props),games:summarize(games),method:'Offline reconstruction using saved standard odds, dated roster identity, and only prior game dates in model fitting. Excludes historical injuries and projections. Separate from frozen forecasts.'},null,2));

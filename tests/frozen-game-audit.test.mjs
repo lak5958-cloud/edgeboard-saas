@@ -40,3 +40,17 @@ test('a final on the current UTC date can settle an earlier Eastern slate',()=>{
  const future=rows.map(row=>({...row,observedAt:'2026-11-03T05:00Z'}));
  assert.equal(auditFrozenGames([report],future,{day:'2026-11-02',now:checkedAt}).unsettled,1);
 });
+
+test('game-market no-vig comparison pairs the exact opposite line from the same book and observation',()=>{
+ const q=(side,line,odds,book='draftkings')=>{
+  const row=entry('Spread',side,line);
+  return {...row,quote:{...row.quote,book,odds,observedAt:savedAt,available:true}};
+ };
+ const home=q('home',-4.5,-120);
+ const away=q('away',4.5,110);
+ assert.equal(audit([home,q('away',5.5,110)]).results[0].marketProbability,null);
+ assert.equal(audit([home,q('away',4.5,110,'fanduel')]).results[0].marketProbability,null);
+ const {results}=audit([home,away]);
+ assert(Math.abs(results[0].marketProbability+results[1].marketProbability-1)<1e-10);
+ assert(Number.isFinite(results[0].marketBrier));
+});
