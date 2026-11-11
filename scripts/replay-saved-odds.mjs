@@ -16,7 +16,9 @@ const strict = args.includes('--point-in-time');
 const outcomeIndex = args.indexOf('--team-outcomes');
 const teamOutcomesFile = outcomeIndex >= 0 ? args.splice(outcomeIndex, 2)[1] : null;
 const [boardFile,evidenceFile,rosterFile,teamFile,verifiedResultsFile] = args.filter(arg => arg !== '--point-in-time');
-if(!teamFile) throw Error('Usage: node scripts/replay-saved-odds.mjs board.json evidence.json roster.json team-history.json [verified-audit-outcomes.json]');
+if(!teamFile || (outcomeIndex >= 0 && (!teamOutcomesFile || teamOutcomesFile.startsWith('--')))) {
+ throw Error('Usage: node scripts/replay-saved-odds.mjs board.json evidence.json roster.json team-history.json [verified-audit-outcomes.json] [--point-in-time] [--team-outcomes finals.json]');
+}
 const read=path=>JSON.parse(readFileSync(path,'utf8'));
 const board=read(boardFile),records=read(evidenceFile),rosters=read(rosterFile),teamRows=read(teamFile).games;
 const cutoff=new Date(board.generatedAt);
@@ -26,7 +28,6 @@ const verifiedByCutoff = row => {
  return Number.isFinite(known) && known <= cutoff.getTime();
 };
 const trainingTeamRows = strict ? teamRows.filter(verifiedByCutoff) : teamRows;
-const marketPairs = indexMarketPairs(board.quotes);
 const day=cutoff.toLocaleDateString('en-CA',{timeZone:'America/New_York'}),gameMap=new Map(board.games.map(g=>[g.eventID,g]));
 const profiles=new Map(),conflictingProfiles=new Set();
 for(const p of [...rosters,...records.map(r=>r.profile).filter(Boolean)]){
@@ -46,10 +47,22 @@ for(const r of records){
  series.get(key).push(r);
 }
 const byBook={},entries=[],coverage={eligibleProps:0,missingRosterIdentity:0,noPropForecast:0,eligibleGameLines:0,noGameForecast:0};
-for(const q of latestQuotes(board.quotes)){
- const game=gameMap.get(q.eventID),asOf=Date.parse(q.asOf);
- if(!game||q.periodID!=='game'||q.alt!==false||!['draftkings','fanduel'].includes(q.book)||implied(q.odds)===null||!Number.isFinite(asOf)||asOf>cutoff.getTime()||Number.isFinite(Date.parse(q.observedAt))&&Date.parse(q.observedAt)>cutoff.getTime()||!quoteStatus(q,game,cutoff).ok)continue;
- if(new Date(game.start).toLocaleDateString('en-CA',{timeZone:'America/New_York'})!==day)continue;
+const datedQuotes = board.quotes.filter(q => {
+ const game = gameMap.get(q.eventID);
+ const priced = Date.parse(q.asOf), observed = Date.parse(q.observedAt);
+ if (!game || game.league !== q.league || !Number.isFinite(Date.parse(game.start))) return false;
+ if (!Number.isFinite(priced) || priced > cutoff.getTime()) return false;
+ if (Number.isFinite(observed) && (observed < priced || observed > cutoff.getTime())) return false;
+ if (strict && !Number.isFinite(observed)) return false;
+ return new Date(game.start).toLocaleDateString('en-CA', {timeZone:'America/New_York'}) === day;
+});
+const usableQuote = q => q.periodID === 'game' && q.alt === false &&
+ ['draftkings','fanduel'].includes(q.book) && implied(q.odds) !== null &&
+ quoteStatus(q, gameMap.get(q.eventID), cutoff).ok;
+const marketPairs = indexMarketPairs(datedQuotes.filter(usableQuote));
+for(const q of latestQuotes(datedQuotes)){
+ if (!usableQuote(q)) continue;
+ const game = gameMap.get(q.eventID);
  if(q.kind==='Player Prop'){
   if(!q.player||!nameKey(q.player)||!Number.isFinite(q.line)||!['over','under'].includes(q.side))continue;
   coverage.eligibleProps++;
@@ -82,4 +95,4 @@ if(verifiedResultsFile)for(const result of read(verifiedResultsFile)){
 const props=auditFrozen(wrap({byBook,modelVersion:'reconstructed-props'}),settlementRecords,{day});
 const games=auditFrozenGames(wrap({entries,modelVersion:'reconstructed-game-lines'}),[...teamRows,...(teamOutcomesFile?read(teamOutcomesFile):[])],{day});
 const summarize=a=>{const summary=summarizeAudits([a]);return {excluded:a.excluded,...summary.overall,byLeague:summary.byLeague,verifiedGames:new Set(a.results.filter(row=>row.brier!==null).map(row=>row.eventID)).size,byStatistic:summary.byStatistic.map(({group,selections,scored,brier,quotedPriceBrier})=>({group,selections,scored,brier,quotedPriceBrier}))};};
-console.log(JSON.stringify({day,observation:board.generatedAt,pointInTimeVerified:strict,coverage,settlementSource:verifiedResultsFile?'Local results plus verified frozen-audit outcomes. Scored prop coverage inherits the audited shortlist selection bias.':'Local result files',props:summarize(props),games:summarize(games),method:'Offline reconstruction using saved standard odds, dated roster identity, and only prior game dates in model fitting. Excludes historical injuries and projections. Separate from frozen forecasts.'},null,2));
+console.log(JSON.stringify({day,observation:board.generatedAt,pointInTimeVerified:strict,coverage,settlementSource:verifiedResultsFile?'Local results plus verified frozen-audit outcomes. Scored prop coverage inherits the audited shortlist selection bias.':'Local result files',props:summarize(props),games:summarize(games),method:'Offline reconstruction using saved standard odds, dated roster identity, and only prior game dates in model fitting. Strict mode also requires input and quote observation timestamps. Excludes historical injuries and projections. Separate from frozen forecasts.'},null,2));
