@@ -8,3 +8,11 @@ test('account names are escaped and plans display the owner-selected price witho
 test('public route configuration matches the new navigation in local and Vercel hosting',()=>{const cfg=JSON.parse(fs.readFileSync(new URL('../vercel.json',import.meta.url))),local=fs.readFileSync(new URL('../scripts/dev.mjs',import.meta.url),'utf8');for(const path of ['/fantasy','/picks','/research','/pricing','/login','/account','/privacy']){assert.ok(cfg.rewrites.some(x=>x.source===path));assert.ok(local.includes(`'${path}'`))}});
 
 test('owner label is independent of ordinary paid or grader access',()=>{assert.match(pageView('/account','NFL',{user:{email:'owner@example.org'},owner:true,pro:true}),/Owner access/);assert.ok(!pageView('/account','NFL',{user:{},pro:true}).includes('Owner access'))});
+
+test('pricing shows a Stripe path for free users and research for the grader',()=>{
+ const free=pageView('/pricing','NFL',anon);
+ assert.match(free,/Checkout opens on Stripe after you sign in/);
+ const grader=pageView('/pricing','NFL',{user:{},pro:true});
+ assert.match(grader,/Your account already includes Pro/);
+ assert.doesNotMatch(grader,/id="checkout"/);
+});

@@ -73,6 +73,14 @@ export function modelLab(audits,{holdoutFrom = null} = {}){
   }
   variants.push({id:strategy,...summary(pairs),byDate:[...new Set(pairs.map(p=>p.row.day))].map(day=>({day,...summary(pairs.filter(p=>p.row.day===day))}))});
  }
+ // Compare a fixed blend only on genuine two-sided prices from the frozen observation.
+ const marketPairs = targets.filter(row => finite(row.marketProbability) &&
+  row.marketProbability > 0 && row.marketProbability < 1);
+ variants.push({
+  id:'market-blend-half-v1',
+  ...summary(marketPairs.map(row => ({row,probability:(row.scoringProbability + row.marketProbability) / 2}))),
+  marketBrier:summary(marketPairs.map(row => ({row,probability:row.marketProbability}))).candidateBrier
+ });
  const direct=new Map();
  for(const row of targets)for(const model of row.researchCandidates?.models||[]){
   if(!(model.pPush>=0&&model.pPush<1)||!finite(model.pWin))continue;

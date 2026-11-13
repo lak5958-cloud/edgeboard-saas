@@ -43,3 +43,21 @@
  #tradeStatus{flex-basis:100%}
  .rosterOptions .settingsGrid{grid-template-columns:minmax(0,1fr)}
 }
+
+.homeHero{align-items:center}
+.homeTrade{background:#132e26;color:#f8f7ef;padding:clamp(20px,4vw,42px);border-radius:12px;min-width:0}
+.homeTradeLabel,.homeTradePlayers small{color:#b9d1c4}
+.homeTradeLabel{font-size:.8rem;margin:0 0 8px}
+.homeTrade h2{margin:0;font-size:clamp(23px,3vw,36px);letter-spacing:-.04em}
+.homeTradePlayers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}
+.homeTradePlayers div{background:#244438;padding:10px;border-radius:6px;min-width:0}
+.homeTradePlayers img{display:block;width:100%;height:100px;object-fit:contain;object-position:bottom}
+.homeTradePlayers strong,.homeTradePlayers small{display:block;line-height:1.35}
+.homeTradePlayers small{margin:8px 0 3px;font-size:.73rem}
+.homeTradePlayers strong{font-size:.9rem}
+.homeTrade>p:last-child{color:#e2eee6;margin:0;font-size:.875rem}
+.homePro{display:flex;justify-content:space-between;align-items:center;gap:20px;border-block:1px solid var(--line)}
+.homePro h2,.homePro p{margin:0}
+.homePro h2{margin-bottom:.45rem}
+.checkoutNote{font-size:.9rem}
+@media(max-width:760px){.homePro{display:block}.homePro .actions{margin-top:16px}}

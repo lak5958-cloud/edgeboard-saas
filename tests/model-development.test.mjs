@@ -85,3 +85,17 @@ test('unchanged outcomes preserve earliest verification and source corrections r
  const corrected=verificationStamp(later,{...row,value:6,observedAt:'2026-11-05T04:00Z'});
  assert.equal(corrected.firstVerifiedAt,'2026-11-05T04:00Z');
 });
+
+test('fixed market blend compares only paired holdout quotes against both component forecasts',()=>{
+ const source = audit().at(-1);
+ const row = {...source.results[0],outcome:'loss',scoringProbability:.8,brier:.64,marketProbability:.4};
+ const earlier = {day:'2026-10-01',results:[{...row,eventID:'earlier'}]};
+ const holdout = {day:'2026-10-07',results:[row,{...row,eventID:'unpaired',marketProbability:null}]};
+ const {variants} = modelLab([earlier,holdout],{holdoutFrom:holdout.day});
+ const blend = variants.find(variant=>variant.id==='market-blend-half-v1');
+ assert.equal(blend.selections,1);
+ assert.equal(blend.games,1);
+ assert.ok(Math.abs(blend.candidateBrier-.36)<1e-12);
+ assert.ok(Math.abs(blend.activeBrier-.64)<1e-12);
+ assert.ok(Math.abs(blend.marketBrier-.16)<1e-12);
+});
