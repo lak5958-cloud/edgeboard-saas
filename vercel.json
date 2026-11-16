@@ -45,6 +45,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/help",
+      "destination": "/index.html"
+    },
+    {
       "source": "/testing",
       "destination": "/index.html"
     }

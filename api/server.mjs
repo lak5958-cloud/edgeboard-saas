@@ -1,14 +1,10 @@
+import {performanceFile,readPublishedAudit} from '../lib/published-audit.mjs';
+import {readSnapshotObject} from '../lib/cloud.mjs';
 import {prepareFantasyForecast,gradeFantasyForecasts} from '../lib/fantasy-forecast.mjs';
 import {researchHealth} from '../lib/research-health.mjs';
-import {createFrozenGameAudit} from '../lib/frozen-game-audit.mjs';
 import {workloadAudit} from '../lib/workload-audit.mjs';
 import {auditDates} from '../lib/audit-summary.mjs';
 import outsideSeed from '../lib/outside-seed.json' with {type:'json'};
-import {auditFrozen} from '../lib/frozen-audit.mjs';
-import {selectFrozenSources,readFrozenSources} from '../lib/frozen-review.mjs';
-import {frozenSources} from '../lib/frozen-sources.mjs';
-import {gunzipSync} from 'node:zlib';
-import {readSnapshotObject} from '../lib/cloud.mjs';
 import {redeemAccessCode} from '../lib/access-code.mjs';
 import {publicGameMarkets} from '../lib/game-markets.mjs';
 import {tradeEvidence,groundedBrief,briefPrompt,defaultBriefSelection} from '../lib/ai-evidence.mjs';
@@ -109,28 +105,14 @@ export default async function handler(req,res){try{
  if(route==='frozen-audit-dates'){requirePro(access);return json(res,200,{dates:auditDates(await snapshot('frozen-index.json',[]))});}
  if(route==='frozen-audit'){
   requirePro(access);if(req.method!=='GET')throw new AppError(405,'GET required.');
-  const day=url.searchParams.get('day')||'2026-11-02';if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day))||new Date(day).toISOString().slice(0,10)!==day)throw new AppError(400,'Choose a valid audit date.');const scope=url.searchParams.get('scope')||'shortlist',gameScope=scope==='games';
+  const day=url.searchParams.get('day')||'2026-11-02';if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day))||new Date(day).toISOString().slice(0,10)!==day)throw new AppError(400,'Choose a valid audit date.');const scope=url.searchParams.get('scope')||'shortlist';
   if(!['shortlist','cohort','trade','games'].includes(scope))throw new AppError(400,'Choose a supported audit group.');
-  const index=await snapshot('frozen-index.json',[]);let selected;try{selected=selectFrozenSources(index,!gameScope&&day==='2026-11-02'?frozenSources:[],day,{kind:gameScope?'games':'players'});}catch(e){throw new AppError(503,e.message);}
-  const gameAudit=gameScope?createFrozenGameAudit({day}):null;
-  let expandedBytes=0;const reports=await readFrozenSources(selected,async source=>{
-   const bytes=await readSnapshotObject(source.path,{timeout:15000});if(!bytes)throw new AppError(503,'A retained pregame snapshot could not be read. No results were inferred.');if(bytes.length>5000000)throw new AppError(503,'Snapshot exceeds audit size limit.');
-   let raw;
-   try{raw=gunzipSync(bytes,{maxOutputLength:gameScope?64000000:20000000});}
-   catch{throw new AppError(503,'A retained snapshot could not be expanded within the audit limit. No partial score is shown.');}
-   if(gameAudit){
-    gameAudit.add({...source,report:JSON.parse(raw.toString())});
-    return null;
-   }
-   expandedBytes+=raw.length;
-   if(expandedBytes>40000000)throw new AppError(503,'Retained snapshots exceed the review memory limit. No partial score is shown.');
-   return JSON.parse(raw.toString());
-  },{concurrency:gameScope?2:4});
-  if(gameScope){
-   const teamHistory=await snapshot('team-history.json',{});
-   return json(res,200,{...gameAudit.finish(teamHistory.games||[]),coverage:`${selected.length} retained game-market snapshots. This group is evaluated separately from player props.`});
+  if(url.searchParams.get('preferGraded')==='1'&&scope!=='trade'){
+   const graded=await snapshot(performanceFile(day,scope),null);
+   if(graded)return json(res,200,graded);
   }
-  const data=await bundle({includeHistory:true});return json(res,200,{...auditFrozen(reports,data.records,{day,scope}),coverage:`All ${selected.length} indexed or legacy retained snapshots for this date were read, with duplicate paths removed. No hourly sampling. ${scope==='trade'?'NBA trade trial captures exact half-point prop forecasts and dated roster evidence.':scope==='cohort'?'Evaluation cohort includes supported standard and alternate props captured before shortlist filtering.':'This view covers published shortlists and watchlists.'} Results remain exploratory, not a calibration certificate or verified historical ROI.`});
+  const index=await snapshot('frozen-index.json',[]);
+  return json(res,200,await readPublishedAudit(index,day,scope,{deadline:Date.now()+200000}));
  }
  if(route==='research-workspace'){
   requirePro(access);const part=url.searchParams.get('part')||'meta';if(!['meta','quotes','records'].includes(part)||!['NBA','NFL'].includes(url.searchParams.get('league')||'NBA'))throw new AppError(400,'Choose a supported research scope.');let version=await snapshotRevision({fresh:part==='meta'});const expected=url.searchParams.get('version');if(expected&&expected!==version)version=await snapshotRevision({fresh:true});

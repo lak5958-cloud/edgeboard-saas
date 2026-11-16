@@ -48,7 +48,7 @@ The pilot accepts an optional fifth input with verified audit outcome rows. They
 
 ## Multiple historical slates and early games after a team change
 
-Run `node scripts/replay-odds-series.mjs manifest.json` with one observation per Eastern slate. Declare the final evaluation start date before looking at scores. File paths are relative to the manifest. Each slate requires a dated board, evidence, roster and team history. Verified outcome rows are optional and affect settlement only.
+Run `node scripts/replay-odds-series.mjs manifest.json` with one observation per Eastern slate. Declare the final evaluation start date before looking at scores. File paths are relative to the manifest. Each slate requires a dated board, evidence, roster and team history. Optional `verifiedOutcomes` and `teamOutcomes` files supply player and team finals for settlement. Series runs require quote observation and historical input verification timestamps at or before the board cutoff. A row with no qualifying timestamp is excluded from forecasting.
 
 ```json
 {

@@ -9,6 +9,17 @@
 <div class="controls"><label>Sport<select id="sport"><option value="NBA">NBA basketball</option><option value="NFL">NFL football</option></select></label><label>Sportsbook<select id="book"><option value="draftkings">DraftKings</option><option value="fanduel">FanDuel</option></select></label><button id="coverageRefresh" type="button">Check saved coverage</button></div>
 <p class="fine">Odds are scheduled hourly from 5 through 10 p.m. Eastern, subject to quota and upcoming games. Coverage checks read saved data and do not request sportsbook odds.</p>
 <section aria-labelledby="coverageTitle"><h2 id="coverageTitle">Before the games</h2><p id="coverageStatus" role="status" aria-live="polite">Checking saved inputs…</p><div id="coverage"></div></section>
-<section class="performanceSection" aria-labelledby="resultsTitle"><h2 id="resultsTitle">After the games</h2><p>Review original pregame forecasts against verified outcomes. Player props and game lines have separate evaluations.</p><div class="controls"><label>Forecast group<select id="scope"><option value="cohort">Broader player sample</option><option value="shortlist">Leans and watchlist</option><option value="games">Game lines</option></select></label><label><input id="allAuditMarkets" type="checkbox" checked> Include both leagues and sportsbooks</label><button id="compare" type="button">Review latest completed slates</button></div><p id="performanceStatus" role="status" aria-live="polite">Select a group to review up to seven completed slates.</p><div id="results"></div></section>
+<section class="performanceSection" aria-labelledby="resultsTitle"><h2 id="resultsTitle">After the games</h2><p>Review original pregame forecasts against verified outcomes. Player props and game lines have separate evaluations.</p><div class="controls"><label>Forecast group<select id="scope"><option value="shortlist">Leans and watchlist</option><option value="cohort">Broader player sample</option><option value="games">Game lines</option></select></label><label><input id="allAuditMarkets" type="checkbox" checked> Include both leagues and sportsbooks</label><label>Ending date<input id="auditEnd" type="date"></label><button id="compare" type="button">Review completed slates</button></div><p id="performanceStatus" role="status" aria-live="polite">Review up to seven completed slates ending on the chosen date. Leave the date blank for the latest slates.</p>
+<div id="trackingFilters" class="controls" hidden>
+<label>Decision<select id="auditDecision"><option value="all">All decisions</option><option value="TAKE">Take</option><option value="LEAN">Lean</option><option value="PASS">Pass</option></select></label>
+<label>Candidate agreement<select id="auditAgreement"><option value="all-states">Any</option><option value="all">All available candidates agree</option><option value="mixed">Mixed agreement</option><option value="none">No candidates agree</option><option value="unavailable">Unavailable</option></select></label>
+<label>Minimum estimated win rate (%)<input id="auditMinimum" type="number" min="0" max="100" step="1" value="0"></label>
+<p class="fine">Agreement means an archived candidate estimated a win rate above the same quoted price’s break-even rate, excluding pushes. The threshold uses each archived model’s non-push win estimate.</p>
+</div>
+<div id="results"></div>
+<section id="ledgerSection" hidden aria-label="Archived selection ledger">
+<h3>Archived selections</h3><div id="ledger"></div><button id="ledgerPrevious" type="button">Previous</button> <button id="ledgerNext" type="button">Next</button>
+</section>
+<div id="modelLab"></div></section>
 </div></main>
 <script type="module" src="./performance.mjs"></script></body></html>

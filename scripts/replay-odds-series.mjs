@@ -17,7 +17,8 @@ for(const slate of manifest.slates){
   if(typeof slate[key]!=='string'||!slate[key].trim())throw Error('Missing slate input '+key);
   return resolve(root,slate[key]);
  });
- const report=JSON.parse(execFileSync(process.execPath,[replay,...files],{encoding:'utf8',maxBuffer:1024*1024}));
+  const teamOutcomes = slate.teamOutcomes ? ['--team-outcomes', resolve(root, slate.teamOutcomes)] : [];
+ const report=JSON.parse(execFileSync(process.execPath,[replay,...files,'--point-in-time',...teamOutcomes],{encoding:'utf8',maxBuffer:1024*1024}));
  if(days.has(report.day))throw Error('Multiple boards for '+report.day+'. Choose one observation before evaluating outcomes.');
  days.add(report.day);
  reports.push(report);
@@ -35,4 +36,4 @@ function summarize(rows,kind){
 }
 const earlier=reports.filter(r=>r.day<holdoutFrom),holdout=reports.filter(r=>r.day>=holdoutFrom);
 const windows=Object.fromEntries([['earlier',earlier],['holdout',holdout]].map(([name,rows])=>[name,{props:summarize(rows,'props'),games:summarize(rows,'games')}]));
-console.log(JSON.stringify({holdoutFrom,windows,reports,method:'One declared observation per Eastern slate. Match model and saved prices on settled lines, then weight each scored date equally. This is a retrospective reconstruction.'},null,2));
+console.log(JSON.stringify({holdoutFrom,windows,reports,method:'One declared observation per Eastern slate. Match model and saved prices on settled lines, then weight each scored date equally. This is a point-in-time retrospective reconstruction.'},null,2));
