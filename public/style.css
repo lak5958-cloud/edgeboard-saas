@@ -61,3 +61,8 @@
 .homePro h2{margin-bottom:.45rem}
 .checkoutNote{font-size:.9rem}
 @media(max-width:760px){.homePro{display:block}.homePro .actions{margin-top:16px}}
+
+.helpTopic{margin-top:1.25rem;scroll-margin-top:1rem}
+.helpTopic details{padding:.85rem 0;border-top:1px solid var(--line)}
+.helpTopic summary{cursor:pointer;font-weight:650}
+.helpTopic details p{margin:.5rem 0 0}

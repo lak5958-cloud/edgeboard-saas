@@ -16,3 +16,13 @@ test('pricing shows a Stripe path for free users and research for the grader',()
  assert.match(grader,/Your account already includes Pro/);
  assert.doesNotMatch(grader,/id="checkout"/);
 });
+
+test('public help links match help topics and routes',()=>{
+ const h=pageView('/help','NBA',anon);
+ for(const id of ['trade-help','accounts','picks-help','billing']){
+  assert.ok(h.includes('id="'+id+'"'));
+  assert.ok(h.includes('href="#'+id+'"'));
+ }
+ assert.match(pageView('/login','NBA',anon),/\/help#accounts/);
+ assert.match(pageView('/pricing','NBA',anon),/\/help#billing/);
+});
