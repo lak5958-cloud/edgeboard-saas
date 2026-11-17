@@ -76,7 +76,8 @@ export function matchupPlayerHistory({game,records=[],rosters=[]},selection){
  }
  return [...games.values()].filter(g=>!g.conflict).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id)).slice(0,30);
 }
-const playerStats=[{key:'points',label:'Points'},{key:'rebounds',label:'Rebounds'},{key:'assists',label:'Assists'},{key:'3pointersmade',label:'Made threes'}];
+const nbaPlayerStats=[{key:'points',label:'Points'},{key:'rebounds',label:'Rebounds'},{key:'assists',label:'Assists'},{key:'3pointersmade',label:'Made threes'}];
+const nflPlayerStats=[{key:'passingyards',label:'Passing yards'},{key:'rushingyards',label:'Rushing yards'},{key:'receivingyards',label:'Receiving yards'},{key:'receptions',label:'Receptions'},{key:'passingtouchdowns',label:'Passing touchdowns'},{key:'rushingtouchdowns',label:'Rushing touchdowns'},{key:'receivingtouchdowns',label:'Receiving touchdowns'}];
 const button=(name,value,chosen,fieldName)=>`<button type="button" class="mlChip ${chosen===value?'active':''}" data-ml-${fieldName}="${esc(value)}" aria-pressed="${chosen===value}">${esc(name)}</button>`;
 const sourceRow=r=>r.source?`<a href="${esc(r.source)}" target="_blank" rel="noopener noreferrer" aria-label="Box score for ${esc(r.date)}">${esc(r.date)} ↗</a>`:esc(r.date);
 function bars(items,{max=null,unit='PPG'}={}){
@@ -99,9 +100,9 @@ function rankings(lab,state,side){
  `;
 }
 function playerSection(lab,records,rosters,state){
- if(lab.game.league!=='NBA')return noHistory('NBA player-history tabs are currently supported. NFL team scoring histories remain available in Overview.');
- const profiles=rosters.filter(p=>p.league==='NBA'&&belongsToGame(p,lab.game)),names=[...new Set(profiles.map(p=>p.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
- const name=names.includes(state.player)?state.player:names[0],stat=playerStats.some(s=>s.key===state.playerStat)?state.playerStat:'points';
+ const playerStats=lab.game.league==='NBA'?nbaPlayerStats:nflPlayerStats;
+ const profiles=rosters.filter(p=>p.league===lab.game.league&&belongsToGame(p,lab.game)),names=[...new Set(profiles.map(p=>p.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+ const name=names.includes(state.player)?state.player:names[0],stat=playerStats.some(s=>s.key===state.playerStat)?state.playerStat:playerStats[0].key;
  if(!name)return noHistory('No identifiable matchup player profiles were included with this saved Research snapshot.');
  const rows=matchupPlayerHistory({game:lab.game,records,rosters},{name,stat}),recent=rows.slice(0,10),values=rows.map(r=>r.value),avg=average(values);
  const anchors=values.length?Array.from(new Set([Math.max(0,Math.floor(avg||0)-2),Math.max(0,Math.floor(avg||0)-1),Math.floor(avg||0),Math.floor(avg||0)+1,Math.floor(avg||0)+2])).sort((a,b)=>a-b):[];
