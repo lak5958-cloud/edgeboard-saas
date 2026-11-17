@@ -41,7 +41,7 @@ export function mountGamePicks({getInput,onOpenQuote,onViewChange=()=>{}}){
   const c=result.counts;
   const label=error||`${rows.length} results match the filters from ${(result.recommendations||[]).length+(result.watchlist||[]).length} screened candidates. ${result.message}`;
   $('picksStatus').textContent=label;
-  $('picksCoverage').textContent=`${c.gameQuotes} stored quotes seen · ${c.scanned} checked · ${c.modeled} model forecasts · ${c.shortlisted} research candidates. This is not an exhaustive odds market; only supported current quotes with positive experimental model return enter this screened set.`;
+  $('picksCoverage').textContent=`${c.gameQuotes} stored quotes seen · ${c.scanned} checked · ${c.modeled} model forecasts · ${c.shortlisted} research candidates. Only supported, currently quoted lines enter the screener; negative-value lines are Pass, and each game is capped at 80 results.`;
   $('picksExclusions').textContent=Object.entries(result.excluded||{}).filter(([,n])=>n).map(([k,n])=>`${k}: ${n}`).join(' · ')||'No exclusions.';
   $('picksResults').innerHTML=rows.length?rows.map((x,i)=>renderPickCard(x,i)).join(''):'<div class="empty">No research candidates matched these filters. This does not mean no 80% lines exist across all bookmakers. Reduce the threshold, widen the odds range or select another game.</div>';
   $('picksResults').querySelectorAll('[data-open-pick]').forEach(b=>b.onclick=()=>{const item=items[Number(b.dataset.openPick)];if(item)onOpenQuote(item.quote,item.id);});
@@ -55,7 +55,7 @@ export function mountGamePicks({getInput,onOpenQuote,onViewChange=()=>{}}){
   for(const book of [...new Set(['draftkings',...books,'all'])])$('picksBook').append(new Option(book==='all'?'All returned books':book==='draftkings'?'DraftKings':book,book));
   $('picksBook').value=previous;if(!$('picksBook').value)$('picksBook').value='draftkings';
   const now=new Date().toISOString(),book=$('picksBook').value,includeAlts=$('picksAlts').checked;
-  const next=JSON.stringify([scope,input.game?.league,input.game?.eventID||input.game?.game,input.revision,book,includeAlts,$('picksPriceBand').value,now.slice(0,16)]);
+  const next=JSON.stringify([scope,input.game?.league,input.game?.eventID||input.game?.game,input.revision,book,includeAlts,$('picksPriceBand').value,$('picksMinimum').value,$('picksOddsMin').value,$('picksOddsMax').value,now.slice(0,16)]);
   if(!force&&next===key){if(report)render(report);return;}key=next;stop();const id=serial;
   $('picksStatus').textContent=`Scanning ${available.length} saved game(s) without requesting new odds…`;
   $('picksCoverage').textContent='Reviewing existing published player histories and exact prices.';$('picksResults').replaceChildren();
@@ -68,7 +68,7 @@ export function mountGamePicks({getInput,onOpenQuote,onViewChange=()=>{}}){
    for(let i=0;i<available.length;i++){
     if(id!==serial||!active)return;
     $('picksStatus').textContent=`Reviewing saved game ${i+1} of ${available.length}…`;
-    reports.push(await scanGamePicks({...input,game:available[i],quotes:scopedQuotes,records,book,includeAlts,priceBand:$('picksPriceBand').value,limit:10,now}));
+    reports.push(await scanGamePicks({...input,game:available[i],quotes:scopedQuotes,records,book,includeAlts,priceBand:$('picksPriceBand').value,limit:80,screener:true,minimumModelWin:Number($('picksMinimum').value||0),oddsMin:Number($('picksOddsMin').value),oddsMax:Number($('picksOddsMax').value),now}));
    }
    if(id!==serial||!active)return;
    const sum=key=>reports.reduce((total,r)=>total+(r.counts?.[key]||0),0);
