@@ -79,6 +79,9 @@ export function mountGamePicks({getInput,onOpenQuote,onViewChange=()=>{}}){
  }
  $('bestPicksTab').onclick=()=>{active=true;views();void scan(true);};$('rescanPicks').onclick=()=>void scan(true);
  for(const id of ['picksBook','picksPriceBand','picksAlts','picksScope'])$(id).addEventListener('change',()=>void scan(true));
- for(const id of ['picksMinimum','picksOddsMin','picksOddsMax','picksSort'])$(id).addEventListener('change',()=>{if(report)render(report);});
+ // Probability and odds bounds affect which markets enter the scan, so widening
+ // them must rescan the saved quotes. Sorting alone can reuse the current report.
+ for(const id of ['picksMinimum','picksOddsMin','picksOddsMax'])$(id).addEventListener('change',()=>void scan(true));
+ $('picksSort').addEventListener('change',()=>{if(report)render(report);});
  return {close(){active=false;stop();key='';views();},update(){views();if(active){clearTimeout(timer);timer=setTimeout(()=>void scan(),120);}},get active(){return active;}};
 }

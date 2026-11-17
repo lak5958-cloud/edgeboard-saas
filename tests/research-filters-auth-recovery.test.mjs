@@ -41,3 +41,9 @@ test('recovery completion requires a valid token and password before contacting 
  assert.match(app,/history\.replaceState/);
  assert.match(pageView('/login','NBA',{user:null,pro:false}),/id="recoveryForm"/);
 });
+
+test('widening probability or odds filter rescans the saved quotes rather than filtering stale results',()=>{
+ const rescanControls="['picksMinimum','picksOddsMin','picksOddsMax'])$(id).addEventListener('change',()=>void scan(true))";
+ assert.ok(picks.includes(rescanControls));
+ assert.ok(picks.includes("$('picksSort').addEventListener('change',()=>{if(report)render(report);})"));
+});
