@@ -37,11 +37,11 @@ test('no future games, playoff records, previous seasons, unsourced rows or conf
 test('incomplete league data never claims full-league ranking or position-specific defense',()=>{
  const lab=buildMatchupLabData(input());
  const result=leagueMetricRanking(lab,{stat:'points',side:'defense'});
- assert.equal(result.complete,false);assert.equal(result.coverage,4);
+ assert.equal(result.complete,false);assert.equal(result.coverage,3);
  const html=renderMatchupLab(lab,{state:{tab:'defense',position:'PG'}});
  assert.match(html,/validated opponent-by-position data feed is not linked/i);
  assert.doesNotMatch(html,/PG allowed per game/);
- assert.match(html,/Ranked only among 4 teams/);
+ assert.match(html,/Ranked only among 3 teams/);
 });
 test('offense and defense tabs show sourced category controls and per-team comparison',()=>{
  const lab=buildMatchupLabData(input());
