@@ -66,3 +66,19 @@
 .helpTopic details{padding:.85rem 0;border-top:1px solid var(--line)}
 .helpTopic summary{cursor:pointer;font-weight:650}
 .helpTopic details p{margin:.5rem 0 0}
+
+/* Peer review: clear first-time guidance and up-front selection factors. */
+.firstVisitHelp,.firstVisitHome{background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px 24px;margin:16px 0 22px}
+.firstVisitHelp h2,.firstVisitHome h2,.pickFilterHeading{font-size:21px;letter-spacing:-.2px;margin:0 0 12px}
+.firstVisitSteps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.firstVisitSteps p{font-size:14px;line-height:1.6;margin:0}
+.firstVisitSteps a{color:var(--green);text-decoration:underline}
+.pickFilters{background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px 24px;margin:14px 0 22px}
+.pickAtGlance{background:#f6f8f6;border:1px solid #dee7df;border-radius:8px;padding:14px 16px;margin:14px 0}
+.pickAtGlance h4{font-size:15px;margin:0 0 8px}
+.pickAtGlance ul{margin:0;padding-left:19px;font-size:13px;line-height:1.55}
+.pickAtGlance li{margin-bottom:6px}
+.pickAtGlance .fine{margin:5px 0 0}
+.pickDecisionDetails{margin:13px 0}
+.pickDecisionDetails .pickQuickReason{font-size:14px;margin:9px 0 0}
+@media(max-width:700px){.firstVisitSteps{grid-template-columns:1fr;gap:10px}.firstVisitHelp,.firstVisitHome,.pickFilters{padding:17px}.pickSortControls{grid-template-columns:1fr}}
