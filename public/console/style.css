@@ -113,3 +113,5 @@
 .mlThreshold strong{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .mlFooter{border-top:1px solid #344451;margin-top:24px;padding-top:14px;color:#93a7b5;line-height:1.6;font-size:12px}
 @media(max-width:690px){.matchupLab{padding:16px!important;margin:18px 0}.mlHeader{flex-wrap:wrap;gap:8px}.mlProvenance{white-space:normal}.mlTeamGrid{grid-template-columns:1fr}.mlChip{padding:8px 12px;font-size:12px}.mlThreshold{grid-template-columns:minmax(87px,125px) minmax(40px,1fr) auto;gap:8px;font-size:11px}.mlHeroNumber{font-size:32px}.mlTable{min-width:450px}}
+
+.mlNotes{margin:22px 0;padding:15px 19px;border:1px solid #315d58;background:rgba(44,99,87,.13);border-radius:12px}.mlNotes h3{margin:0 0 8px!important}.mlNotes ul{padding-left:18px;margin:0}.mlNotes li{line-height:1.75;color:#c9dadf;margin:5px 0}
