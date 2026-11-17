@@ -34,8 +34,7 @@ export default async function handler(req,res){try{
  if(route==='billing/config'){
   if(url.searchParams.get('verify')==='1'){
    if(req.method!=='GET')throw new AppError(405,'GET required.');
-   requirePro(await accessFor(req,res));
-   await budget(req,'billing-config',10);
+   await budget(req,'billing-config',30);
    return json(res,200,await verifyBillingConfig());
   }
   return json(res,200,billingReadiness());
