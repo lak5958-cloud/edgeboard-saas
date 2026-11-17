@@ -85,3 +85,16 @@ test('the live Research console includes a full-width interactive lab hooked to 
  assert.match(app,/matchupLab.update\(\)/);
  assert.match(app,/scrollIntoView/);
 });
+
+test('NFL Research exposes sourced receiving game logs without importing future results',()=>{
+ const nfl={league:'NFL',game:'NYG @ PHI',away:'NYG',home:'PHI',start:'2026-11-23T00:00:00Z'};
+ const profiles=[{league:'NFL',id:'501',subject:'Sample Receiver',team:'PHI',position:'WR'}];
+ const records=[{league:'NFL',subject:'Sample Receiver',athleteID:'501',stat:'receiving yards',periodID:'game',games:[
+  {gameID:'n1',date:'2026-11-10',seasonType:'regular',value:88,source:'https://www.espn.com/nfl/boxscore/_/gameId/n1'},
+  {gameID:'n2',date:'2026-11-24',seasonType:'regular',value:500,source:'https://www.espn.com/nfl/boxscore/_/gameId/n2'}
+ ]}];
+ const rows=matchupPlayerHistory({game:nfl,records,rosters:profiles},{name:'Sample Receiver',stat:'receivingyards'});
+ assert.equal(rows.length,1);assert.equal(rows[0].value,88);
+ const html=renderMatchupLab(buildMatchupLabData({game:nfl,context:{teamGames:[]}}),{rosters:profiles,records,state:{tab:'players',player:'Sample Receiver',playerStat:'receivingyards'}});
+ assert.match(html,/Receiving yards/);assert.match(html,/Game-by-game history/);assert.doesNotMatch(html,/500/);
+});
