@@ -47,7 +47,7 @@ function gameQuotes(){return dataset().filter(q=>q.league===league&&q.game===gam
 function hasCurrent(q){const target=data.games.find(g=>g.league===q.league&&g.game===q.game);return quoteStatus(q,target,new Date(),75).ok;}
 const expectedServerVersion='1.12.1';
 const evaluationView=mountEvaluation({getReport:()=>({report:historicalReport,error:historicalLoadError}),onComplete:()=>load()});
-const picksView=mountGamePicks({getInput:()=>({game:selectedGame(),quotes:dataset(),records:evidence,context,research:notes,experts,revision:dataRevision}),onOpenQuote:openBoardQuote,onViewChange:onPicksViewChange});
+const picksView=mountGamePicks({getInput:()=>({game:selectedGame(),games:data.games||[],quotes:dataset(),records:evidence,context,research:notes,experts,revision:dataRevision}),onOpenQuote:openBoardQuote,onViewChange:onPicksViewChange});
 async function responseJson(response,endpoint){
  const body=await response.text();const contentType=String(response.headers.get('content-type')||'').toLowerCase();
  if(!contentType.includes('application/json')){
