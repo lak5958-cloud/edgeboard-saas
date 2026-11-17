@@ -43,3 +43,13 @@
 .researchStartHere{border:1px solid #345047;background:#142723;padding:12px 18px;margin:10px 0 14px;border-radius:8px;font-size:13px;line-height:1.6;color:#d0e4da}
 .researchStartHere summary{cursor:pointer;font-weight:700;color:#e0f2e9}
 .researchStartHere ol{padding-left:24px}.researchStartHere li{margin:5px 0}.researchStartHere p{color:#bdd1c6}
+
+/* Accessible model-vs-price comparison for first-time research users. */
+.picksTools input[type="number"]{width:100%;min-width:105px;box-sizing:border-box;padding:10px 12px;background:var(--surface,#161c23);color:inherit;border:1px solid #496077;border-radius:8px}
+.pickVisualComparison{background:rgba(105,158,200,.07);border:1px solid rgba(140,177,196,.22);border-radius:12px;padding:14px;margin:14px 0}
+.pickVisualLabel{display:flex;gap:12px;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:6px}
+.pickVisualLabel strong{font-size:15px;font-variant-numeric:tabular-nums}
+.pickMeter{height:10px;border-radius:99px;background:#293b4a;overflow:hidden;margin-bottom:14px}
+.pickMeter span{display:block;height:100%;border-radius:inherit;background:#75caab}
+.pickMeterRequired span{background:#b2bbce}
+.pickVisualNote{display:block;line-height:1.5;opacity:.75}
