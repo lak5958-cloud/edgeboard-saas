@@ -39,7 +39,9 @@ test('incomplete league data never claims full-league ranking or position-specif
  const result=leagueMetricRanking(lab,{stat:'points',side:'defense'});
  assert.equal(result.complete,false);assert.equal(result.coverage,3);
  const html=renderMatchupLab(lab,{state:{tab:'defense',position:'PG'}});
- assert.match(html,/validated opponent-by-position data feed is not linked/i);
+ assert.match(html,/complete defense-versus-position feed is not connected/i);
+ assert.match(html,/Scoring defense · actual points allowed per game/);
+ assert.match(html,/Most allowed among tracked teams/);
  assert.doesNotMatch(html,/PG allowed per game/);
  assert.match(html,/Ranked only among 3 teams/);
 });
@@ -97,4 +99,39 @@ test('NFL Research exposes sourced receiving game logs without importing future 
  assert.equal(rows.length,1);assert.equal(rows[0].value,88);
  const html=renderMatchupLab(buildMatchupLabData({game:nfl,context:{teamGames:[]}}),{rosters:profiles,records,state:{tab:'players',player:'Sample Receiver',playerStat:'receivingyards'}});
  assert.match(html,/Receiving yards/);assert.match(html,/Game-by-game history/);assert.doesNotMatch(html,/500/);
+});
+
+test('schedule-only opponent scores appear in Defense even without detailed box-score metrics',()=>{
+ const schedule=[
+  {league:'NBA',date:'2026-11-14',gameID:'812',team:'BOS',opponent:'NYK',seasonType:'regular',seasonYear:2026,source:'https://www.espn.com/nba/game/_/gameId/812',points:112,allowed:103},
+  {league:'NBA',date:'2026-11-15',gameID:'813',team:'GSW',opponent:'SAC',seasonType:'regular',seasonYear:2026,source:'https://www.espn.com/nba/game/_/gameId/813',points:109,allowed:117}
+ ];
+ const lab=buildMatchupLabData({game,context:{teamGames:schedule}});
+ assert.equal(teamMetric(lab.teams[0],'points','defense').value,117);
+ assert.equal(teamMetric(lab.teams[1],'points','defense').value,103);
+ const html=renderMatchupLab(lab,{state:{tab:'defense',metric:'assists',position:'PG'}});
+ assert.match(html,/Scoring defense · actual points allowed per game/);
+ assert.match(html,/117\.0/);
+ assert.match(html,/103\.0/);
+ assert.match(html,/Team-wide defensive results remain visible/);
+ assert.match(html,/opponent box-score data/i);
+});
+test('matched ESPN schedule and detailed box score for same game combine without double counting',()=>{
+ const schedule={...good[0],stats:{},allowed:100};
+ const details={...good[0],stats:{points:112,assists:23,rebounds:45,'3pointersmade':16},allowed:{points:100,assists:20,rebounds:41,'3pointersmade':10}};
+ const lab=buildMatchupLabData({game,context:{matchupGames:[schedule,details]}});
+ assert.equal(lab.teams[1].n,1);
+ assert.equal(teamMetric(lab.teams[1],'assists','defense').value,20);
+ assert.equal(teamMetric(lab.teams[1],'3pointersmade').value,16);
+});
+test('matchup analysis is above the market explorer and can switch game without scrolling to sidebar',()=>{
+ const html=readFileSync(new URL('../public/console/index.html',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../public/console/app.mjs',import.meta.url),'utf8');
+ assert.ok(html.indexOf('id="matchupLab"')>0);
+ assert.ok(html.indexOf('id="matchupLab"')<html.indexOf('class="workspace"'));
+ assert.match(app,/onSelectGame:next=>switchGame\(next\)/);
+ const markup=renderMatchupLab(buildMatchupLabData(input()),{games:[game]});
+ assert.match(markup,/Choose matchup/);
+ assert.match(markup,/data-ml-select="game"/);
+ assert.match(markup,/class="mlDetails"><summary>/);
 });
