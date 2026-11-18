@@ -124,3 +124,17 @@
 .mlBaseline>strong{display:block;margin-bottom:10px;color:#d8f5e9}
 .mlBaseline .mlBars{max-width:650px}
 @media(max-width:690px){.mlGamePicker select{max-width:100%}.mlBaseline{padding:12px 13px}}
+
+/* Source-verified historical games vs the actual upcoming opponent. */
+.mlOpponentHistory{border:1px solid #38574f;border-radius:13px;background:linear-gradient(125deg,rgba(45,97,79,.18),rgba(24,35,44,.82));padding:18px;margin:19px 0 24px}
+.mlOpponentHeading{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.mlOpponentHeading h3{margin:3px 0 8px!important;font-size:19px;letter-spacing:-.02em;color:#f1fcf5}
+.mlHistoryCoverage{font-size:12px;font-weight:700;color:#9ed9c6}
+.mlOpponentCards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:17px 0}
+.mlOpponentCard{background:#182a2b;border:1px solid #37554f;border-radius:10px;display:flex;flex-direction:column;gap:5px;padding:13px;min-width:0}
+.mlOpponentCard span{font-size:12px;line-height:1.4;color:#c0e2d6}
+.mlOpponentCard strong{font-size:28px;line-height:1.3;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.mlOpponentCard small{font-size:11px;color:#9caeb3}
+.mlOpponentHistory .mlChips{gap:6px}
+.mlOpponentHistory .mlChip{font-size:12px}
+@media(max-width:640px){.mlOpponentHistory{padding:13px}.mlOpponentCards{grid-template-columns:1fr 1fr;gap:8px}.mlOpponentCard{padding:10px}.mlOpponentCard strong{font-size:22px}.mlOpponentCards>:last-child{grid-column:1/-1}}
