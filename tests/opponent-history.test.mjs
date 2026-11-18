@@ -34,7 +34,7 @@ test('separates games against the next opponent by franchise represented at game
  assert.match(html,/With current franchise/);
  assert.match(html,/With previous teams/);
  assert.match(html,/Team at the time unverified/);
- assert.match(html,/same lineup or role was identical/i);
+ assert.match(html,/current lineup or role was identical/i);
  assert.match(html,/12\.0/);
  assert.doesNotMatch(html,/999/);
  assert.doesNotMatch(html,/99<\/strong>/);
