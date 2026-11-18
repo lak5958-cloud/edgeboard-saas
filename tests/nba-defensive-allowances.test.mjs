@@ -81,8 +81,8 @@ test('Defense tab shows sourced allowed 3PM, attempts, percentage, boards, assis
  assert.equal(teamMetric(bos,'turnovers','defense').value,13);
  const html=renderMatchupLab(lab,{state:{tab:'defense',metric:'3pointersmade'}});
  for(const name of ['Opponent 3PM','Opponent 3PA','Opponent 3P%','Opponent rebounds','Opponent assists','Opponent turnovers','See every sourced defensive game'])assert.ok(html.includes(name),name);
- assert.match(html,/13\\.0/);
- assert.match(html,/34\\.0/);
+ assert.match(html,/13\.0/);
+ assert.match(html,/34\.0/);
 });
 test('lost allowed object is recovered only from consistent opposing-team games',()=>{
  const original=summaryTeams(makeSummary());
