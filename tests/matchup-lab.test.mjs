@@ -114,7 +114,7 @@ test('schedule-only opponent scores appear in Defense even without detailed box-
  assert.match(html,/117\.0/);
  assert.match(html,/103\.0/);
  assert.match(html,/Team-wide defensive results remain visible/);
- assert.match(html,/opponent box-score data/i);
+ assert.match(html,/opponent box-score totals/i);
 });
 test('matched ESPN schedule and detailed box score for same game combine without double counting',()=>{
  const schedule={...good[0],stats:{},allowed:100};
