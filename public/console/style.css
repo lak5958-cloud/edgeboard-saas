@@ -53,3 +53,65 @@
 .pickMeter span{display:block;height:100%;border-radius:inherit;background:#75caab}
 .pickMeterRequired span{background:#b2bbce}
 .pickVisualNote{display:block;line-height:1.5;opacity:.75}
+
+/* Research Matchup Lab: verified, game-scoped and keyboard-accessible statistics. */
+.matchupLab{margin:22px 0;padding:24px!important;scroll-margin-top:24px;background:linear-gradient(145deg,#151e27 0%,#111820 55%,#11171e 100%);border:1px solid #334253}
+.mlHeader{display:flex;gap:20px;justify-content:space-between;align-items:flex-start;margin-bottom:19px}
+.mlHeader h2{font-size:clamp(23px,3vw,36px);letter-spacing:-.035em;margin:4px 0 8px;font-weight:760;color:#f5f7fb}
+.mlHeader h2 span{font-size:.65em;color:#8b9bab;font-weight:400}
+.mlHeader .eyebrow{color:#6fceb1;letter-spacing:.12em;font-size:11px}
+.mlProvenance{background:#142b29;border:1px solid #3d6d64;color:#aee2cc;border-radius:999px;padding:6px 11px;white-space:nowrap;font-size:11px}
+.mlTabs,.mlChips{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0}
+.mlChip{background:#1d2832;color:#b8c9d9;border:1px solid #374857;border-radius:999px;padding:9px 16px;min-height:39px;cursor:pointer;font:inherit;font-weight:650}
+.mlChip:hover,.mlChip:focus-visible{border-color:#93ddc4;color:#fff;outline-offset:3px}
+.mlChip.active,.mlChip[aria-pressed="true"]{background:#326c60;border-color:#56c6a2;color:#fff}
+.mlTabs{border-bottom:1px solid #33404b;padding-bottom:12px}
+.mlToolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:12px 0 20px}
+.mlToolbar label,.mlPlayerControls label{display:grid;gap:4px;font-size:12px;color:#b5c9d8}
+.mlToolbar select,.mlPlayerControls select{min-height:39px;color:#e8f0f5;background:#18232c;border:1px solid #50616f;border-radius:8px;padding:7px 13px;max-width:100%}
+.mlSmall{color:#9eafbd;font-size:12px;line-height:1.65;margin:5px 0}
+.mlIntro{line-height:1.65;color:#cbd7e2;margin:0 0 16px;max-width:960px}
+.mlTeamGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:15px 0 22px}
+.mlTeam{background:#19232d;border:1px solid #364755;padding:19px;border-radius:13px;min-width:0}
+.mlTeam h3{font-size:20px;letter-spacing:-.03em;margin:8px 0}
+.mlTeam>span{color:#a4b7c5;display:block;font-size:12px}
+.mlMini{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:#84c8b6!important}
+.mlHeroNumber{display:block;font-size:37px;line-height:1.2;color:#f5fafb;font-variant-numeric:tabular-nums;letter-spacing:-.035em;margin:8px 0}
+.mlTeam dl{display:flex;gap:15px;flex-wrap:wrap;margin:15px 0 0;padding-top:12px;border-top:1px solid #34414d}
+.mlTeam dl div{min-width:100px}
+.mlTeam dt{font-size:11px;color:#91a7b6}
+.mlTeam dd{font-size:17px;font-weight:750;margin:3px 0 0;color:#f1f8fc}
+.mlBarRow{padding:12px 0}
+.mlBarMeta{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
+.mlBarMeta span{font-size:13px;font-weight:600}
+.mlBarMeta strong{font-variant-numeric:tabular-nums}
+.mlBarMeta small{color:#9eabb9;font-size:11px}
+.mlTrack{height:11px;background:#33414f;border-radius:20px;overflow:hidden;margin:7px 0}
+.mlFill{background:#55cba6;height:100%;border-radius:inherit;min-width:0}
+.mlFillAlt{background:#5c9fda}
+.mlBarRow>small{font-size:11px;color:#91a7b4}
+.mlBody h3{font-size:17px;margin:20px 0 6px}
+.mlRanking{margin:20px 0}
+.mlTableScroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+.mlTable{border-collapse:collapse;width:100%;min-width:460px;font-size:13px;font-variant-numeric:tabular-nums}
+.mlTable th{text-align:left;padding:11px 12px;background:#1c2933;color:#c1d2dd;font-weight:650;border-bottom:1px solid #384b59;white-space:nowrap}
+.mlTable td{padding:12px;border-bottom:1px solid #33404c;color:#dae3ea}
+.mlTable tr:hover td{background:#1c2832}
+.mlTable a{color:#8bddc3;text-decoration:underline}
+.mlTable td strong{color:#f1f9fb}
+.mlDetails{border:1px solid #314653;border-radius:10px;padding:14px 16px;margin:18px 0}
+.mlDetails summary{font-weight:650;cursor:pointer}
+.mlDetails h4{margin:17px 0 6px}
+.mlPosition{border:1px solid #405365;border-radius:10px;padding:12px 15px;margin:16px 0}
+.mlPosition>strong{font-size:13px}
+.mlEmpty{border:1px dashed #435566;border-radius:10px;padding:18px;color:#bdcdd8;line-height:1.65;background:#19252f}
+.mlPlayerControls{display:flex;flex-wrap:wrap;gap:14px;margin:15px 0}
+.mlPlayerControls label{min-width:min(230px,100%);flex:1}
+.mlThresholds{display:grid;gap:12px;margin:17px 0 22px}
+.mlThreshold{display:grid;grid-template-columns:minmax(110px,180px) minmax(80px,1fr) auto;gap:16px;align-items:center;font-size:13px}
+.mlThreshold .mlTrack{margin:0}
+.mlThreshold strong{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mlFooter{border-top:1px solid #344451;margin-top:24px;padding-top:14px;color:#93a7b5;line-height:1.6;font-size:12px}
+@media(max-width:690px){.matchupLab{padding:16px!important;margin:18px 0}.mlHeader{flex-wrap:wrap;gap:8px}.mlProvenance{white-space:normal}.mlTeamGrid{grid-template-columns:1fr}.mlChip{padding:8px 12px;font-size:12px}.mlThreshold{grid-template-columns:minmax(87px,125px) minmax(40px,1fr) auto;gap:8px;font-size:11px}.mlHeroNumber{font-size:32px}.mlTable{min-width:450px}}
+
+.mlNotes{margin:22px 0;padding:15px 19px;border:1px solid #315d58;background:rgba(44,99,87,.13);border-radius:12px}.mlNotes h3{margin:0 0 8px!important}.mlNotes ul{padding-left:18px;margin:0}.mlNotes li{line-height:1.75;color:#c9dadf;margin:5px 0}

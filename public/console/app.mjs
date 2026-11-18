@@ -15,7 +15,8 @@ import {normalizeBoardMarkets} from './board-markets.mjs';
 import {noVigIndex,evidenceIndex,singleFlight} from './browser-performance.mjs';
 import {mountEvaluation} from './evaluation-ui.mjs';
 import {decisionReadback,renderDecisionChecks,renderValidationProgress} from './decision-ui.mjs';
-import {mountGamePicks} from './picks-ui.mjs';import {quoteIdentity} from './picks.mjs';import {findBoardMarket} from './market-finder.mjs';import {latestQuotes} from './quote-selection.mjs';
+import {mountGamePicks} from './picks-ui.mjs';
+import {mountMatchupLab} from './matchup-lab.mjs';import {quoteIdentity} from './picks.mjs';import {findBoardMarket} from './market-finder.mjs';import {latestQuotes} from './quote-selection.mjs';
 import {contextReadback} from './context.mjs';import {observedContext} from './matchups.mjs';
 import {quoteProfile,identityRecords,rosterOptions,belongsToGame} from './rosters.mjs';
 import {pairedNoVig} from './market-math.mjs';
@@ -48,6 +49,7 @@ function hasCurrent(q){const target=data.games.find(g=>g.league===q.league&&g.ga
 const expectedServerVersion='1.12.1';
 const evaluationView=mountEvaluation({getReport:()=>({report:historicalReport,error:historicalLoadError}),onComplete:()=>load()});
 const picksView=mountGamePicks({getInput:()=>({game:selectedGame(),games:data.games||[],quotes:dataset(),records:evidence,context,research:notes,experts,revision:dataRevision}),onOpenQuote:openBoardQuote,onViewChange:onPicksViewChange});
+const matchupLab=mountMatchupLab(document.getElementById('matchupLabContent'),()=>({game:selectedGame(),context,records:evidence,rosters}));
 async function responseJson(response,endpoint){
  const body=await response.text();const contentType=String(response.headers.get('content-type')||'').toLowerCase();
  if(!contentType.includes('application/json')){
@@ -109,7 +111,7 @@ function render(){
  $('mode').textContent=live?'PROVIDER SNAPSHOT':'SCHEDULE ONLY';$('updated').textContent='Saved '+dt(data.generatedAt);$('statusDot').style.background=fresh.length?'#48d7ad':'#e8b56f';
  $('gamesTotal').textContent=gs.length;$('marketsTotal').textContent=dq.length;$('altsTotal').textContent=dq.filter(q=>q.alt&&hasCurrent(q)).length;
  $('dataIntegrity').textContent=fresh.length?`${fresh.length} verified DraftKings quotes`:'No verified DraftKings prices';$('freshState').textContent=fresh.length?'Price and timestamp checked · models not calibrated':'Missing, stale or unavailable until refreshed';
- renderGames();refreshSelectors();renderMarket();renderBoardWarning(fresh);picksView.update();
+ renderGames();refreshSelectors();renderMarket();renderBoardWarning(fresh);picksView.update();matchupLab.update();
 }
 function renderGames(){
  const term=$('gameSearch').value.trim().toLowerCase(),gs=gamesInLeague().filter(g=>(g.game+' '+(g.home||'')+' '+(g.away||'')).toLowerCase().includes(term));
@@ -295,6 +297,7 @@ $('reload').addEventListener('click',async()=>{
  }catch(err){refreshRunning=false;refreshMessage(`Refresh could not start: ${err.message}. Check your server and try again.`,true,false)}
 });
 $('gameSearch').addEventListener('input',renderGames);
+$('matchupLabTab').addEventListener('click',()=>{document.getElementById('matchupLab').scrollIntoView({behavior:'smooth',block:'start'});});
 let marketSearchTimer;
 $('marketSearch').addEventListener('input',()=>{clearTimeout(marketSearchTimer);marketSearchTimer=setTimeout(()=>{subject='';stat='';period='';side='';selectedLine=null;refreshSelectors();renderMarket();},150);});
 for(const id of ['nba','nfl'])$(id).addEventListener('click',()=>switchLeague(id.toUpperCase()));
