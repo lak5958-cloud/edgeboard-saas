@@ -115,3 +115,12 @@
 @media(max-width:690px){.matchupLab{padding:16px!important;margin:18px 0}.mlHeader{flex-wrap:wrap;gap:8px}.mlProvenance{white-space:normal}.mlTeamGrid{grid-template-columns:1fr}.mlChip{padding:8px 12px;font-size:12px}.mlThreshold{grid-template-columns:minmax(87px,125px) minmax(40px,1fr) auto;gap:8px;font-size:11px}.mlHeroNumber{font-size:32px}.mlTable{min-width:450px}}
 
 .mlNotes{margin:22px 0;padding:15px 19px;border:1px solid #315d58;background:rgba(44,99,87,.13);border-radius:12px}.mlNotes h3{margin:0 0 8px!important}.mlNotes ul{padding-left:18px;margin:0}.mlNotes li{line-height:1.75;color:#c9dadf;margin:5px 0}
+
+/* Matchup statistics now appear immediately below the Research header. */
+.matchupLab{scroll-margin-top:16px;margin:18px 0 22px!important}
+.mlGamePicker{display:grid;gap:7px;margin:9px 0 18px;font-size:13px;font-weight:650;color:#cce4dd}
+.mlGamePicker select{width:100%;max-width:470px;padding:10px 13px;background:#18232c;color:#f1f9fc;border:1px solid #5a746f;border-radius:9px;font:inherit}
+.mlBaseline{border:1px solid #316255;border-radius:12px;background:rgba(62,142,116,.13);padding:15px 18px;margin:14px 0 20px}
+.mlBaseline>strong{display:block;margin-bottom:10px;color:#d8f5e9}
+.mlBaseline .mlBars{max-width:650px}
+@media(max-width:690px){.mlGamePicker select{max-width:100%}.mlBaseline{padding:12px 13px}}
