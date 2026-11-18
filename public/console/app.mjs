@@ -49,7 +49,7 @@ function hasCurrent(q){const target=data.games.find(g=>g.league===q.league&&g.ga
 const expectedServerVersion='1.12.1';
 const evaluationView=mountEvaluation({getReport:()=>({report:historicalReport,error:historicalLoadError}),onComplete:()=>load()});
 const picksView=mountGamePicks({getInput:()=>({game:selectedGame(),games:data.games||[],quotes:dataset(),records:evidence,context,research:notes,experts,revision:dataRevision}),onOpenQuote:openBoardQuote,onViewChange:onPicksViewChange});
-const matchupLab=mountMatchupLab(document.getElementById('matchupLabContent'),()=>({game:selectedGame(),context,records:evidence,rosters}));
+const matchupLab=mountMatchupLab(document.getElementById('matchupLabContent'),()=>({game:selectedGame(),games:data.games||[],context,records:evidence,rosters}),{onSelectGame:next=>switchGame(next)});
 async function responseJson(response,endpoint){
  const body=await response.text();const contentType=String(response.headers.get('content-type')||'').toLowerCase();
  if(!contentType.includes('application/json')){
