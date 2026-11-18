@@ -104,3 +104,32 @@ test('partial stat coverage stays missing, never inferred from zeros',()=>{
  assert.equal(stats.value,null);assert.equal(stats.n,0);
  assert.match(renderMatchupLab(lab,{state:{tab:'defense',metric:'3pointersmade'}}),/0 games/);
 });
+
+test('collector backfills incomplete NBA defense once and preserves rich totals across later schedule refreshes',async()=>{
+ const {collectSports}=await import('../lib/sports-collector.mjs');
+ const snapshot=makeSummary();
+ snapshot.boxscore.players=[
+  {team:{abbreviation:'ORL'},statistics:[{name:'stats',names:['PTS'],athletes:[{athlete:{id:'201',displayName:'Sample Orlando'},stats:['20']}]}]},
+  {team:{abbreviation:'BOS'},statistics:[{name:'stats',names:['PTS'],athletes:[{athlete:{id:'202',displayName:'Sample Boston'},stats:['17']}]}]}
+ ];
+ const now=new Date('2026-11-28T14:00:00Z'),at=now.toISOString();
+ const state={NBATeamsAt:at,NFLTeamsAt:at,events:{'NBA|401909994':{league:'NBA',gameID:'401909994',date:'2026-11-16',done:true,checkedAt:at}}};
+ const old=summaryTeams(snapshot).map(r=>({league:'NBA',team:r.team,teamID:r.teamID,gameID:r.gameID,date:r.date,
+   seasonYear:r.seasonYear,seasonType:'regular',source:r.source,points:r.points,allowed:r.pointsAllowed}));
+ const data={rosters:[],autoRecords:[],fantasyLogs:[],context:{injuries:[],teamGames:old},schedule:{games:[]}};
+ let summaryCalls=0;
+ const get=async url=>{if(url.endsWith('/injuries'))return {injuries:[]};
+  if(url.includes('/summary?event=401909994')){summaryCalls++;return snapshot;}
+  throw Error('Unexpected source: '+url);};
+ const result=await collectSports(data,state,{get,now,maxEvents:10});
+ assert.equal(result.processed,1);
+ assert.equal(summaryCalls,1);
+ const bos=result.updates['team-history.json'].games.find(r=>r.team==='BOS');
+ assert.equal(bos.allowed['3pointersmade'],13);
+ assert.equal(bos.allowed['3pointersattempted'],34);
+ assert.equal(bos.stats['3pointersmade'],20);
+ assert.equal(result.state.events['NBA|401909994'].nbaDefenseAttemptedAt,at);
+ const again=await collectSports({...data,context:{injuries:[],teamGames:result.updates['team-history.json'].games},autoRecords:result.updates['evidence.auto.json']},result.state,{get,now,maxEvents:10});
+ assert.equal(again.processed,0);
+ assert.equal(summaryCalls,1);
+});
