@@ -13,7 +13,7 @@ const dateOnly=x=>String(x||'').slice(0,10);
 const validDate=x=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x));
 const normStat=(object,key)=>{if(!object||typeof object!=='object')return null;for(const [k,v] of Object.entries(object))if(normalizeStat(k)===normalizeStat(key)&&finite(v))return Number(v);return null;};
 const metrics={
- NBA:[{key:'points',label:'Points',unit:'PPG'},{key:'rebounds',label:'Rebounds',unit:'RPG'},{key:'assists',label:'Assists',unit:'APG'},{key:'3pointersmade',label:'Made threes',unit:'3PM'},{key:'pace',label:'Estimated pace',unit:'poss./48'}],
+ NBA:[{key:'points',label:'Points',unit:'PPG'},{key:'3pointersmade',label:'Made threes',unit:'3PM/G'},{key:'3pointersattempted',label:'Three-point attempts',unit:'3PA/G'},{key:'3pointpct',label:'Three-point %',unit:'%'},{key:'rebounds',label:'Rebounds',unit:'RPG'},{key:'assists',label:'Assists',unit:'APG'},{key:'turnovers',label:'Turnovers',unit:'TOV/G'},{key:'steals',label:'Steals',unit:'STL/G'},{key:'blocks',label:'Blocks',unit:'BLK/G'},{key:'pace',label:'Estimated pace',unit:'poss./48'}],
  NFL:[{key:'points',label:'Points',unit:'PPG'}]
 };
 function actualTeamRow(raw,league,cutoff,year){
@@ -22,8 +22,8 @@ function actualTeamRow(raw,league,cutoff,year){
  if(raw?.seasonType!=='regular'||!validDate(date)||date>=cutoff||Number(raw?.seasonYear)!==year||!id||!code||!link||!finite(raw?.points)||!finite(raw?.pointsAllowed??(finite(raw?.allowed)?raw.allowed:null)))return null;
  const allowed=Number(raw.pointsAllowed??raw.allowed),points=Number(raw.points),stats=raw.stats||{},given=typeof raw.allowed==='object'?raw.allowed:{};
  return {league,date,gameID:id,team:code,opponent:teamCode(raw.opponent,league),source:link,points,pointsAllowed:allowed,home:raw.home===true,
-  rebounds:normStat(stats,'rebounds'),assists:normStat(stats,'assists'),threes:normStat(stats,'3pointersmade'),
-  reboundsAllowed:normStat(given,'rebounds'),assistsAllowed:normStat(given,'assists'),threesAllowed:normStat(given,'3pointersmade'),
+  rebounds:normStat(stats,'rebounds'),assists:normStat(stats,'assists'),threes:normStat(stats,'3pointersmade'),threeAttempts:normStat(stats,'3pointersattempted'),turnovers:normStat(stats,'turnovers'),steals:normStat(stats,'steals'),blocks:normStat(stats,'blocks'),
+  reboundsAllowed:normStat(given,'rebounds'),assistsAllowed:normStat(given,'assists'),threesAllowed:normStat(given,'3pointersmade'),threeAttemptsAllowed:normStat(given,'3pointersattempted'),turnoversAllowed:normStat(given,'turnovers'),stealsAllowed:normStat(given,'steals'),blocksAllowed:normStat(given,'blocks'),
   pace:finite(raw.pace)?Number(raw.pace):null};
 }
 function sourcedTeamGames(rows,league,cutoff,year){
@@ -32,11 +32,29 @@ function sourcedTeamGames(rows,league,cutoff,year){
   const key=r.team+'|'+r.gameID,prior=byId.get(key);
   if(!prior)byId.set(key,r);
   else if(prior.points!==r.points||prior.pointsAllowed!==r.pointsAllowed||prior.opponent!==r.opponent)byId.set(key,{conflict:true});
-  else byId.set(key,{...prior,...Object.fromEntries(['rebounds','assists','threes','reboundsAllowed','assistsAllowed','threesAllowed','pace'].map(k=>[k,Number.isFinite(prior[k])?prior[k]:r[k]]))});
+  else byId.set(key,{...prior,...Object.fromEntries(['rebounds','assists','threes','threeAttempts','turnovers','steals','blocks','reboundsAllowed','assistsAllowed','threesAllowed','threeAttemptsAllowed','turnoversAllowed','stealsAllowed','blocksAllowed','pace'].map(k=>[k,Number.isFinite(prior[k])?prior[k]:r[k]]))});
  }
- return [...byId.values()].filter(x=>!x.conflict).sort((a,b)=>b.date.localeCompare(a.date)||b.gameID.localeCompare(a.gameID));
+ const valid=[...byId.values()].filter(x=>!x.conflict);
+ // If a schedule refresh dropped the opponent's detailed allowed totals,
+ // derive them only from the verified OTHER team's sourced offensive box score.
+ for(const r of valid){
+  const opponent=byId.get(r.opponent+'|'+r.gameID);
+  if(!opponent||opponent.conflict||opponent.opponent!==r.team||opponent.date!==r.date||
+     r.pointsAllowed!==opponent.points||opponent.pointsAllowed!==r.points)continue;
+  for(const [allowed,offense] of [['reboundsAllowed','rebounds'],['assistsAllowed','assists'],['threesAllowed','threes'],
+   ['threeAttemptsAllowed','threeAttempts'],['turnoversAllowed','turnovers'],['stealsAllowed','steals'],['blocksAllowed','blocks']]){
+   if(!Number.isFinite(r[allowed])&&Number.isFinite(opponent[offense]))r[allowed]=opponent[offense];
+  }
+ }
+ for(const r of valid){
+  r.threesPctAllowed=Number.isFinite(r.threesAllowed)&&Number.isFinite(r.threeAttemptsAllowed)&&r.threeAttemptsAllowed>0?
+   100*r.threesAllowed/r.threeAttemptsAllowed:null;
+  r.threesPct=Number.isFinite(r.threes)&&Number.isFinite(r.threeAttempts)&&r.threeAttempts>0?
+   100*r.threes/r.threeAttempts:null;
+ }
+ return valid.sort((a,b)=>b.date.localeCompare(a.date)||b.gameID.localeCompare(a.gameID));
 }
-const field=(m,side)=>side==='defense'?({points:'pointsAllowed',rebounds:'reboundsAllowed',assists:'assistsAllowed','3pointersmade':'threesAllowed',pace:'pace'}[m]):({points:'points',rebounds:'rebounds',assists:'assists','3pointersmade':'threes',pace:'pace'}[m]);
+const field=(m,side)=>side==='defense'?({points:'pointsAllowed',rebounds:'reboundsAllowed',assists:'assistsAllowed','3pointersmade':'threesAllowed','3pointersattempted':'threeAttemptsAllowed','3pointpct':'threesPctAllowed',turnovers:'turnoversAllowed',steals:'stealsAllowed',blocks:'blocksAllowed',pace:'pace'}[m]):({points:'points',rebounds:'rebounds',assists:'assists','3pointersmade':'threes','3pointersattempted':'threeAttempts','3pointpct':'threesPct',turnovers:'turnovers',steals:'steals',blocks:'blocks',pace:'pace'}[m]);
 export function buildMatchupLabData({game,context={}}={}){
  if(!game||!['NBA','NFL'].includes(game.league))return {game:null,teams:[],allTeams:[],season:null,cutoff:null,metrics:[]};
  const cutoff=dateOnly(game.start),year=seasonYear(game.league,cutoff);
