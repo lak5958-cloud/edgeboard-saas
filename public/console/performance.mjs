@@ -4,6 +4,7 @@ import {coverageView,performanceHeadline} from './performance-view.mjs';
 import {summarizeAudits} from './audit-summary.mjs';
 import {auditSummaryView} from './audit-summary-view.mjs';
 import {modelLabView} from './model-lab-view.mjs';
+import {frozenDefenseView} from './defense-validation.mjs';
 const el=id=>document.getElementById(id);
 let coverageBusy=false,request=0,alive=true;
 async function coverage(){
@@ -42,6 +43,7 @@ function clearPerformance() {
  loadedAudits = [];
  el('results').replaceChildren();
  el('modelLab').replaceChildren();
+ el('defenseContextLab').replaceChildren();
  el('trackingFilters').hidden = el('ledgerSection').hidden = true;
  el('performanceStatus').textContent = 'Select Review completed slates to load the selected forecast group.';
 }
@@ -87,6 +89,7 @@ el('compare').onclick = async () => {
   if (audits.length) {
    try {
     const holdoutFrom = selected.at(-2)?.day ?? selected.at(-1)?.day;
+    el('defenseContextLab').innerHTML = frozenDefenseView(audits, {holdoutFrom});
     const lab = await compare(audits, {holdoutFrom});
     if (id === auditRequest) el('modelLab').innerHTML = modelLabView(audits, lab);
    } catch (error) {
